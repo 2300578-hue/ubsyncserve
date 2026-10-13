@@ -16,7 +16,7 @@
                 </div>
                 <div class="flex-1">
                     <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Products Sold</p>
-                    <p class="text-3xl font-black text-blue-600" x-text="productSalesMetrics.totalItemsSold"></p>
+                    <p class="text-3xl font-black text-blue-600" x-text="formatQuantity(productSalesMetrics.totalItemsSold)"></p>
                     <p class="text-[10px] font-bold text-slate-400 mt-1">Total quantity</p>
                 </div>
             </div>
@@ -29,9 +29,9 @@
                     <i class="fas fa-coins text-2xl text-[#800000]"></i>
                 </div>
                 <div class="flex-1">
-                    <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Revenue</p>
-                    <p class="text-3xl font-black text-[#800000]" x-text="formatCurrency(productSalesMetrics.totalRevenue + (productSalesMetrics.totalRevenue * 0.05))"></p>
-                    <p class="text-[10px] font-bold text-emerald-600 mt-1"><i class="fas fa-caret-up"></i> Incl. 5% VAT</p>
+                    <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">Sales in Period</p>
+                    <p class="text-3xl font-black text-[#800000]" x-text="formatCurrency(salesSummary.total)"></p>
+                    <p class="text-[10px] font-bold text-emerald-600 mt-1">Final order totals, VAT included</p>
                 </div>
             </div>
         </div>
@@ -66,7 +66,7 @@
                                 </div>
                             </td>
                             <td class="px-6 py-5 text-center">
-                                <span class="text-sm font-bold text-slate-700" x-text="product.qtySold"></span>
+                                <span class="text-sm font-bold text-slate-700" x-text="formatQuantity(product.qtySold)"></span>
                             </td>
                             <td class="px-6 py-5 text-right">
                                 <span class="text-sm font-bold text-slate-700" x-text="formatCurrency(product.unitCost)"></span>

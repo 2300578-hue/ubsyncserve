@@ -7,6 +7,8 @@
         </p>
     </div>
 
+    @include('manager.sales-shift-controls')
+
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
         <!-- Total Sales Card -->
         <div class="clay-card p-6 shadow-md hover:shadow-lg transition-all border border-slate-100">
@@ -29,9 +31,9 @@
                     <i class="fas fa-shopping-bag text-2xl text-emerald-600"></i>
                 </div>
                 <div class="flex-1">
-                    <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">Orders Completed</p>
+                    <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">Orders in Period</p>
                     <p class="text-3xl font-black text-emerald-600" x-text="metrics.totalOrders"></p>
-                    <p class="text-[10px] font-bold text-slate-400 mt-1">Total processed today</p>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1">Paid orders for the selected dates</p>
                 </div>
             </div>
         </div>
@@ -65,7 +67,7 @@
                             <img :src="item.img" :alt="item.name" class="w-12 h-12 rounded-lg object-cover border border-slate-200">
                             <span class="text-sm font-black text-slate-700 uppercase tracking-tight" x-text="item.name"></span>
                         </div>
-                        <span class="text-xs font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100" x-text="item.qty + ' Sold'"></span>
+                        <span class="text-xs font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100" x-text="formatQuantity(item.qty) + ' Sold'"></span>
                     </div>
                 </template>
             </div>
@@ -81,7 +83,7 @@
                     <div class="flex justify-between items-center p-5 hover:bg-slate-50 transition-colors">
                         <div class="flex items-center gap-4">
                             <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                                <i class="fas fa-check text-xs font-black"></i>
+                                <i class="fas fa-receipt text-xs font-black"></i>
                             </div>
                             <div>
                                 <p class="text-xs font-black text-slate-800 uppercase" x-text="history.orderId"></p>

@@ -32,6 +32,13 @@
         .table-card-available { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); }
         .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1050; }
         [x-cloak] { display: none !important; }
+
+        @media print {
+            body { background: white !important; }
+            .aws-header, .gold-accent, .aws-sidebar { display: none !important; }
+            .main-content { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+            .clay-card { box-shadow: none !important; break-inside: avoid; }
+        }
     </style>
 </head>
 
@@ -110,6 +117,12 @@
                 <i class="fas fa-bag-shopping w-5"></i> Product Sales
             </button>
 
+            <button @click="tab = 'saleshistory'"
+                class="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-sm"
+                :class="tab === 'saleshistory' ? 'bg-red-50 text-[#800000] font-black' : 'text-slate-500 hover:bg-slate-50 font-bold'">
+                <i class="fas fa-file-invoice-dollar w-5"></i> Sales History
+            </button>
+
         </div>
     </aside>
 
@@ -134,6 +147,10 @@
             @include('manager.product-sales')
         </div>
 
+        <div x-show="tab === 'saleshistory'" x-cloak>
+            @include('manager.sales-history')
+        </div>
+
     </main>
 
     <script>
@@ -156,12 +173,39 @@
                voidOrderIndex: null,
                voidCodeInput: '',
                managerCode: '1234',
-               salesDateFilter: 'today',
+               salesPreset: 'today',
+               salesFromDate: '',
+               salesToDate: '',
+               businessDate: '',
+               businessDayCutoff: '00:00',
+               savedBusinessDayCutoff: '00:00',
+               businessDayCutoffLoaded: false,
+               openingFloat: '0.00',
                currentReceiptOrderId: '',
 
                 // Analytics Data
                 salesSummary: { total: 0 },
                orderHistory: [],
+               salesShiftReport: {
+                   summary: {
+                       order_count: 0,
+                       items_sold: 0,
+                       gross_sales: 0,
+                       discount_total: 0,
+                       net_sales: 0,
+                       vat_total: 0,
+                       total_sales: 0,
+                       cash_sales: 0,
+                       gcash_sales: 0
+                   },
+                   products: [],
+                   transactions: [],
+                   daily_reports: []
+               },
+               currentShift: null,
+               isSavingSalesShift: false,
+               isConfirmingPrint: false,
+               salesShiftError: '',
                 
                 // Open Tables Data
              openTables: [],
@@ -229,6 +273,17 @@
                     });
                 },
 
+                quantityAsNumber(value) {
+                    const quantity = Number(value);
+                    return Number.isFinite(quantity) ? quantity : 0;
+                },
+
+                formatQuantity(value) {
+                    return this.quantityAsNumber(value).toLocaleString(undefined, {
+                        maximumFractionDigits: 0
+                    });
+                },
+
                 selectedDiscountSummary() {
                     const discountedItems = (this.selectedTable?.orders || []).filter(item => item.discountType);
                     const types = [...new Set(discountedItems.map(item => item.discountType))];
@@ -246,18 +301,214 @@
               
      
 
-      loadAnalytics() {
-    const storedHistory = localStorage.getItem('ub_order_history');
+                get salesExportUrl() {
+                    const params = new URLSearchParams({ preset: this.salesPreset });
+                    if (this.salesPreset === 'custom') {
+                        params.set('from', this.salesFromDate);
+                        params.set('to', this.salesToDate);
+                    }
 
-    this.orderHistory = storedHistory
-        ? JSON.parse(storedHistory)
-        : [];
+                    return `{{ route('manager.api.sales-shift.export') }}?${params.toString()}`;
+                },
 
-    this.salesSummary.total = this.orderHistory.reduce(
-        (sum, order) => sum + Number(order.totalAmount),
-        0
-    );
-},
+                formatBusinessDate(value) {
+                    if (!value) {
+                        return '—';
+                    }
+
+                    return new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                },
+
+                formatShiftTime(value) {
+                    return value ? new Date(value).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        timeZone: 'Asia/Manila'
+                    }) : '—';
+                },
+
+                formatCutoffTime(value) {
+                    const [hours, minutes] = value.split(':').map(Number);
+                    const period = hours >= 12 ? 'PM' : 'AM';
+                    const displayHours = hours % 12 || 12;
+
+                    return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+                },
+
+                async loadAnalytics() {
+                    if (this.salesPreset === 'custom' && (!this.salesFromDate || !this.salesToDate)) {
+                        return;
+                    }
+
+                    this.salesShiftError = '';
+                    const params = new URLSearchParams({ preset: this.salesPreset });
+                    if (this.salesPreset === 'custom') {
+                        params.set('from', this.salesFromDate);
+                        params.set('to', this.salesToDate);
+                    }
+
+                    try {
+                        const response = await fetch(`{{ route('manager.api.sales-shift.show') }}?${params.toString()}`, {
+                            headers: { 'Accept': 'application/json' }
+                        });
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to load sales reports.');
+                        }
+
+                        this.businessDate = result.business_date;
+                        if (!this.businessDayCutoffLoaded) {
+                            this.businessDayCutoff = result.cutoff_time;
+                            this.savedBusinessDayCutoff = result.cutoff_time;
+                            this.businessDayCutoffLoaded = true;
+                        }
+                        this.currentShift = result.current_shift;
+                        this.salesShiftReport = result;
+                        this.orderHistory = result.transactions || [];
+                        this.salesSummary.total = Number(result.summary.total_sales || 0);
+                        if (this.salesPreset === 'custom') {
+                            this.salesFromDate = result.from;
+                            this.salesToDate = result.to;
+                        }
+                    } catch (error) {
+                        this.salesShiftError = error.message || 'Unable to load sales reports.';
+                        this.currentShift = null;
+                        this.salesShiftReport = {
+                            summary: {
+                                order_count: 0,
+                                items_sold: 0,
+                                gross_sales: 0,
+                                discount_total: 0,
+                                net_sales: 0,
+                                vat_total: 0,
+                                total_sales: 0,
+                                cash_sales: 0,
+                                gcash_sales: 0
+                            },
+                            products: [],
+                            transactions: [],
+                            daily_reports: []
+                        };
+                        this.orderHistory = [];
+                        this.salesSummary.total = 0;
+                    }
+                },
+
+                async startSalesShift() {
+                    if (this.isSavingSalesShift || this.currentShift?.status === 'open') {
+                        return;
+                    }
+
+                    this.isSavingSalesShift = true;
+                    this.salesShiftError = '';
+
+                    try {
+                        const response = await fetch(`{{ route('manager.api.sales-shift.start') }}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ opening_float: this.openingFloat })
+                        });
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to start sales.');
+                        }
+
+                        await this.loadAnalytics();
+                    } catch (error) {
+                        this.salesShiftError = error.message || 'Unable to start sales.';
+                    } finally {
+                        this.isSavingSalesShift = false;
+                    }
+                },
+
+                async closeSalesShift() {
+                    if (
+                        this.isSavingSalesShift
+                        || this.currentShift?.status !== 'open'
+                        || !confirm('Close sales now? This will save the total earnings for this shift.')
+                    ) {
+                        return;
+                    }
+
+                    this.isSavingSalesShift = true;
+                    this.salesShiftError = '';
+
+                    try {
+                        const response = await fetch(`{{ route('manager.api.sales-shift.close') }}`, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            }
+                        });
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to close sales.');
+                        }
+
+                        await this.loadAnalytics();
+                        const zRead = result.summary;
+                        alert([
+                            'Z-READ SUMMARY',
+                            `Orders: ${this.formatQuantity(zRead.order_count)}`,
+                            `Items sold: ${this.formatQuantity(zRead.items_sold)}`,
+                            `Gross sales: ${this.formatCurrency(zRead.gross_sales)}`,
+                            `Discounts: ${this.formatCurrency(zRead.discount_total)}`,
+                            `Net sales: ${this.formatCurrency(zRead.net_sales)}`,
+                            `VAT: ${this.formatCurrency(zRead.vat_total)}`,
+                            `Total sales: ${this.formatCurrency(zRead.total_sales)}`,
+                            `Opening float: ${this.formatCurrency(zRead.opening_float)}`,
+                            `Expected drawer: ${this.formatCurrency(zRead.expected_cash_drawer)}`
+                        ].join('\n'));
+                    } catch (error) {
+                        this.salesShiftError = error.message || 'Unable to close sales.';
+                    } finally {
+                        this.isSavingSalesShift = false;
+                    }
+                },
+
+                async saveBusinessDayCutoff() {
+                    if (this.isSavingSalesShift || this.currentShift?.status === 'open') {
+                        return;
+                    }
+
+                    const selectedCutoff = this.businessDayCutoff;
+                    this.salesShiftError = '';
+                    this.isSavingSalesShift = true;
+                    try {
+                        const response = await fetch(`{{ route('manager.api.sales-settings.update') }}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ business_day_cutoff: selectedCutoff })
+                        });
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to save the business cutoff.');
+                        }
+
+                        this.businessDayCutoff = result.cutoff_time;
+                        this.savedBusinessDayCutoff = result.cutoff_time;
+                        this.businessDayCutoffLoaded = true;
+                        await this.loadAnalytics();
+                    } catch (error) {
+                        this.businessDayCutoff = this.savedBusinessDayCutoff;
+                        this.salesShiftError = error.message || 'Unable to save the business cutoff.';
+                    } finally {
+                        this.isSavingSalesShift = false;
+                    }
+                },
 
 async loadTablesFromStorage() {
                 try {
@@ -773,12 +1024,12 @@ await this.loadProducts();
             } catch (error) {
                 alert(error.message);
             }
-            this.loadAnalytics();
+            await this.loadAnalytics();
             await this.loadTablesFromStorage();
             this.loadReservationsFromStorage();
 
-            window.addEventListener('storage', () => {
-                this.loadAnalytics();
+            window.addEventListener('storage', async () => {
+                await this.loadAnalytics();
                 this.loadTablesFromStorage();
                 this.loadReservationsFromStorage();
             });
@@ -790,7 +1041,7 @@ await this.loadProducts();
 
                 this.isRefreshingDashboard = true;
                 try {
-                    this.loadAnalytics();
+                    await this.loadAnalytics();
                     await this.loadTablesFromStorage();
                 } finally {
                     this.isRefreshingDashboard = false;
@@ -808,14 +1059,15 @@ await this.loadProducts();
                 
                 // Analytics Metrics
                 get metrics() {
-                    let totalOrders = this.orderHistory ? this.orderHistory.length : 0;
+                    let totalOrders = this.salesShiftReport.summary.order_count;
                     let avgOrder = totalOrders > 0 ? (this.salesSummary.total / totalOrders) : 0;
                     
                     let itemCounts = {};
                     this.orderHistory.forEach(order => {
                         if(order.items && Array.isArray(order.items)) {
                             order.items.forEach(item => {
-                                itemCounts[item.name] = (itemCounts[item.name] || 0) + item.qty;
+                                const quantity = this.quantityAsNumber(item.qty);
+                                itemCounts[item.name] = (itemCounts[item.name] || 0) + quantity;
                             });
                         }
                     });
@@ -868,58 +1120,14 @@ await this.loadProducts();
 
                 // Product Sales Metrics
                 get productSalesMetrics() {
-                    let filtered = this.filteredProductSales;
-                    let totalRevenue = filtered.reduce((sum, p) => sum + p.totalRevenue, 0);
-                    let totalItemsSold = filtered.reduce((sum, p) => sum + p.qtySold, 0);
-
-                    return { totalRevenue, totalItemsSold };
+                    return {
+                        totalRevenue: this.salesShiftReport.summary.total_sales,
+                        totalItemsSold: this.salesShiftReport.summary.items_sold
+                    };
                 },
 
                 get filteredProductSales() {
-                    let today = new Date();
-                    let startDate, endDate;
-
-                    if (this.salesDateFilter === 'today') {
-                        startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                        endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-                    } else {
-                        let yesterday = new Date(today);
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        startDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
-                        endDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
-                    }
-
-                    let productSalesMap = {};
-                    let totalRevenue = 0;
-
-                    if (this.orderHistory && Array.isArray(this.orderHistory)) {
-                        this.orderHistory.forEach(transaction => {
-                            if (transaction.items && Array.isArray(transaction.items)) {
-                                transaction.items.forEach(item => {
-                                    if (!productSalesMap[item.name]) {
-                                        let product = this.products.find(p => p.name === item.name);
-                                        productSalesMap[item.name] = {
-                                            id: product ? product.id : 0,
-                                            name: item.name,
-                                            qtySold: 0,
-                                            unitCost: product ? product.cost : 0,
-                                            totalRevenue: 0,
-                                            imgPath: product && product.img ? (product.img.includes('data:') || product.img.includes('http') ? product.img : '/img/' + product.img) : '/img/placeholder.png'
-                                        };
-                                    }
-                                    let itemTotal = item.price * item.qty;
-                                    productSalesMap[item.name].qtySold += item.qty;
-                                    productSalesMap[item.name].totalRevenue += itemTotal;
-                                    totalRevenue += itemTotal;
-                                });
-                            }
-                        });
-                    }
-
-                    return Object.values(productSalesMap).map(p => ({
-                        ...p,
-                        percentageOfSales: totalRevenue > 0 ? (p.totalRevenue / totalRevenue) * 100 : 0
-                    })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+                    return this.salesShiftReport.products;
                 },
 
                 getCurrentDate() {
@@ -948,36 +1156,59 @@ await this.loadProducts();
                     this.showCompleteOrderModal = true;
                 },
 
-                confirmPrint(tableId) {
-                    let analyticsHistory = JSON.parse(localStorage.getItem('ub_order_history') || '[]');
-
-                    if (this.selectedTable && this.selectedTable.orders && this.selectedTable.orders.length > 0) {
-                        // Check if this transaction already exists to prevent duplicates
-                        const transactionExists = analyticsHistory.some(t => t.orderId === this.currentReceiptOrderId);
-
-                        if (!transactionExists) {
-                            const transaction = {
-                                orderId: this.currentReceiptOrderId,
-                                timestamp: new Date().toLocaleTimeString(),
-                                totalAmount: (this.selectedTable.bill || 0) * 1.05,
-                                tableId: tableId,
-                                items: this.selectedTable.orders.map(item => ({
-                                    name: item.name,
-                                    qty: item.qty,
-                                    price: item.price,
-                                    addonName: item.addonName
-                                })),
-                                status: 'completed'
-                            };
-
-                            analyticsHistory.unshift(transaction);
-                            localStorage.setItem('ub_order_history', JSON.stringify(analyticsHistory));
-                        }
+                async confirmPrint(tableId) {
+                    if (this.isConfirmingPrint || tableId === null || tableId === undefined) {
+                        return;
                     }
 
-                    alert('✓ Order ' + this.currentReceiptOrderId + ' printed successfully!');
-                    this.showCompleteOrderModal = false;
-                    this.clearTable(tableId);
+                    this.isConfirmingPrint = true;
+                    try {
+                        let analyticsHistory = JSON.parse(localStorage.getItem('ub_order_history') || '[]');
+
+                        if (this.selectedTable && this.selectedTable.orders && this.selectedTable.orders.length > 0) {
+                            const response = await fetch(`{{ url('/api/orders/settle-table') }}/${tableId}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({})
+                            });
+                            const result = await response.json().catch(() => ({}));
+                            if (!response.ok) {
+                                throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to record this payment.');
+                            }
+
+                            const transactionExists = analyticsHistory.some(t => t.orderId === this.currentReceiptOrderId);
+                            if (!transactionExists) {
+                                analyticsHistory.unshift({
+                                    orderId: this.currentReceiptOrderId,
+                                    timestamp: new Date().toISOString(),
+                                    totalAmount: (this.selectedTable.bill || 0) * 1.05,
+                                    tableId: tableId,
+                                    items: this.selectedTable.orders.map(item => ({
+                                        name: item.name,
+                                        qty: item.qty,
+                                        price: item.price,
+                                        addonName: item.addonName
+                                    })),
+                                    status: 'completed'
+                                });
+
+                                localStorage.setItem('ub_order_history', JSON.stringify(analyticsHistory));
+                            }
+                            await this.loadAnalytics();
+                        }
+
+                        alert('✓ Order ' + this.currentReceiptOrderId + ' printed successfully!');
+                        this.showCompleteOrderModal = false;
+                        await this.clearTable(tableId);
+                    } catch (error) {
+                        alert(error.message || 'Unable to record the table payment.');
+                    } finally {
+                        this.isConfirmingPrint = false;
+                    }
                 }
             }
         }

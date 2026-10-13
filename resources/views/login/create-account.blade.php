@@ -116,17 +116,17 @@
 
             <div class="account-field space-y-1.5">
                 <label for="first-name" class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">First Name</label>
-                <input type="text" id="first-name" x-model="firstName" required class="custom-input" placeholder="Enter your first name">
+                <input type="text" id="first-name" x-model="firstName" required class="custom-input" placeholder="">
             </div>
 
             <div class="account-field space-y-1.5">
                 <label for="last-name" class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">Last Name</label>
-                <input type="text" id="last-name" x-model="lastName" required class="custom-input" placeholder="Enter your last name">
+                <input type="text" id="last-name" x-model="lastName" required class="custom-input" placeholder="">
             </div>
 
             <div class="account-field space-y-1.5">
                 <label for="email" class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">Email</label>
-                <input type="email" id="email" x-model="email" required class="custom-input" placeholder="Enter your email">
+                <input type="email" id="email" x-model="email" required class="custom-input" placeholder="">
             </div>
 
             <div class="account-field space-y-1.5">
@@ -139,12 +139,12 @@
 
             <div class="account-field space-y-1.5">
                 <label for="password" class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">Password</label>
-                <input type="password" id="password" x-model="password" required minlength="4" class="custom-input" placeholder="Enter your password">
+                <input type="password" id="password" x-model="password" required minlength="4" class="custom-input" placeholder="">
             </div>
 
             <div class="account-field space-y-1.5">
                 <label for="confirm-password" class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">Confirm Password</label>
-                <input type="password" id="confirm-password" x-model="confirmPassword" required minlength="4" class="custom-input" placeholder="Confirm your password">
+                <input type="password" id="confirm-password" x-model="confirmPassword" required minlength="4" class="custom-input" placeholder="">
             </div>
 
             <button type="submit" :disabled="isLoading" class="sm:col-span-2 w-full ub-maroon-btn font-bold py-2.5 rounded-xl uppercase tracking-widest text-[12px] mt-1 disabled:opacity-50 disabled:cursor-not-allowed">

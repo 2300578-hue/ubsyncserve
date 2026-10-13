@@ -1,5 +1,26 @@
 window.tableStateApi = {
     inFlightLoad: null,
+
+    async refreshCsrfToken() {
+        const response = await fetch('/csrf-token', {
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            throw new Error('Your session has expired. Refresh the page and sign in again.');
+        }
+
+        const result = await response.json();
+        const tokenElement = document.querySelector('meta[name="csrf-token"]');
+        if (!tokenElement || !result.token) {
+            throw new Error('Unable to refresh the security token. Refresh the page and try again.');
+        }
+
+        tokenElement.content = result.token;
+        return result.token;
+    },
+
     async load() {
         if (this.inFlightLoad) {
             return this.inFlightLoad;
@@ -26,38 +47,56 @@ window.tableStateApi = {
     },
 
     async save(tables) {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        const response = await fetch('/api/tables', {
+        const sendSaveRequest = (token) => fetch('/api/tables', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken || '',
+                'X-CSRF-TOKEN': token,
                 'Accept': 'application/json'
             },
             body: JSON.stringify({ tables })
         });
+        let csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        let response = await sendSaveRequest(csrfToken || '');
+
+        if (response.status === 419) {
+            csrfToken = await this.refreshCsrfToken();
+            response = await sendSaveRequest(csrfToken);
+        }
 
         if (!response.ok) {
             const result = await response.json().catch(() => ({}));
-            const error = new Error(result.message || 'Unable to save table statuses to the server.');
+            const message = response.status === 419
+                ? 'Your session expired. Refresh the page and try again.'
+                : result.message || 'Unable to save table statuses to the server.';
+            const error = new Error(message);
             alert(error.message);
             throw error;
         }
     },
 
     async clear(tableNumber) {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-        const response = await fetch(`/api/tables/${encodeURIComponent(tableNumber)}/clear`, {
+        const sendClearRequest = (token) => fetch(`/api/tables/${encodeURIComponent(tableNumber)}/clear`, {
             method: 'POST',
             headers: {
-                'X-CSRF-TOKEN': csrfToken || '',
+                'X-CSRF-TOKEN': token,
                 'Accept': 'application/json'
             }
         });
+        let csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+        let response = await sendClearRequest(csrfToken || '');
+
+        if (response.status === 419) {
+            csrfToken = await this.refreshCsrfToken();
+            response = await sendClearRequest(csrfToken);
+        }
 
         if (!response.ok) {
             const result = await response.json().catch(() => ({}));
-            throw new Error(result.message || 'Unable to clear the table.');
+            const message = response.status === 419
+                ? 'Your session expired. Refresh the page and try again.'
+                : result.message || 'Unable to clear the table.';
+            throw new Error(message);
         }
     }
 };

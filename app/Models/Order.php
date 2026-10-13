@@ -12,14 +12,24 @@ class Order extends Model
         'order_number',
         'table_number',
         'waiter_id',
+        'sales_shift_id',
         'status',
         'total_amount',
+        'subtotal_amount',
+        'discount_amount',
+        'vat_amount',
+        'payment_method',
+        'paid_at',
     ];
 
     protected function casts(): array
     {
         return [
             'total_amount' => 'decimal:2',
+            'subtotal_amount' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
+            'vat_amount' => 'decimal:2',
+            'paid_at' => 'datetime',
         ];
     }
 
@@ -31,5 +41,10 @@ class Order extends Model
     public function waiter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'waiter_id');
+    }
+
+    public function salesShift(): BelongsTo
+    {
+        return $this->belongsTo(SalesShift::class);
     }
 }

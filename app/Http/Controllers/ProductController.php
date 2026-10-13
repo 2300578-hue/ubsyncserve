@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\SalesSetting;
+use App\Models\SalesShift;
+use Carbon\CarbonImmutable;
 use Database\Seeders\ProductSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -58,8 +62,35 @@ class ProductController extends Controller
             'children' => ['sometimes', 'integer', 'min:0'],
             'discount_type' => ['nullable', Rule::in(['senior', 'pwd'])],
         ]);
+        if (
+            ! Schema::hasTable('sales_shifts')
+            || ! Schema::hasTable('sales_settings')
+            || ! Schema::hasColumn('orders', 'sales_shift_id')
+        ) {
+            abort(503, 'Sales reporting database is not set up. Run php artisan migrate, then reload this page.');
+        }
 
         $result = DB::transaction(function () use ($data): array {
+                $salesShift = SalesShift::query()
+                    ->where('status', 'open')
+                    ->lockForUpdate()
+                    ->first();
+
+                $settings = SalesSetting::current();
+                $businessDate = CarbonImmutable::now('Asia/Manila');
+                if ($businessDate->format('H:i') < substr($settings->business_day_cutoff, 0, 5)) {
+                    $businessDate = $businessDate->subDay();
+                }
+
+                if (
+                    $salesShift === null
+                    || $salesShift->business_date->toDateString() !== $businessDate->toDateString()
+                ) {
+                    throw ValidationException::withMessages([
+                        'sales' => ['Sales are currently closed. Ask the manager to start a sales shift.'],
+                    ]);
+                }
+
                 $itemsByProduct = collect($data['items'])->groupBy('product_id');
                 $products = [];
 
@@ -192,8 +223,12 @@ class ProductController extends Controller
                     'order_number' => 'ORD-'.Str::upper((string) Str::uuid()),
                     'table_number' => $tableNumber,
                     'waiter_id' => Auth::id(),
+                    'sales_shift_id' => $salesShift->id,
                     'status' => 'pending',
                     'total_amount' => $grandTotalAmount,
+                    'subtotal_amount' => $subtotalAmount,
+                    'discount_amount' => $discountAmount,
+                    'vat_amount' => $vatAmount,
                 ]);
 
                 foreach ($orderItems as $orderItem) {

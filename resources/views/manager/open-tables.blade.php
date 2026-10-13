@@ -451,9 +451,10 @@
                 </div>
 
                 <!-- Action Button -->
-                <div class="bg-slate-50 p-4 flex gap-3 border-t border-slate-200">
-                    <button @click="confirmPrint(selectedTable?.tableNumber || selectedTable?.id)" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-all flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-check"></i> Confirm Print
+                <div class="bg-slate-50 p-4 border-t border-slate-200">
+                    <button @click="confirmPrint(selectedTable?.tableNumber || selectedTable?.id)" :disabled="isConfirmingPrint" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                        <i class="fa-solid fa-check"></i>
+                        <span x-text="isConfirmingPrint ? 'Recording payment…' : 'Confirm Print'"></span>
                     </button>
                 </div>
             </div>

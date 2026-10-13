@@ -609,7 +609,7 @@
                 </div>
             </div>
 
-            <div class="bg-slate-50 p-4 flex gap-3 border-t border-slate-200">
+            <div class="bg-slate-50 p-4 border-t border-slate-200">
                 <button type="button" @click.stop="confirmPrint(selectedTable?.id)" :disabled="isConfirmingPrint || !selectedTable" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
                     <i class="fa-solid fa-check"></i>
                     <span x-text="isConfirmingPrint ? 'Processing…' : 'Confirm Print'"></span>
@@ -1182,11 +1182,25 @@ async startSession() {
 
                 const orderItems = table.orders || [];
                 if (orderItems.length > 0 && table.status !== 'reserved-advance' && table.isPaid !== true) {
+                    const paymentResponse = await fetch(`{{ url('/api/orders/settle-table') }}/${tableId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                    const paymentResult = await paymentResponse.json().catch(() => ({}));
+                    if (!paymentResponse.ok) {
+                        throw new Error(Object.values(paymentResult.errors || {}).flat()[0] || paymentResult.message || 'Unable to record this payment.');
+                    }
+
                     const transactionExists = analyticsHistory.some(t => t.orderId === this.currentReceiptOrderId);
                     if (!transactionExists) {
                         analyticsHistory.unshift({
                             orderId: this.currentReceiptOrderId,
-                            timestamp: new Date().toLocaleTimeString(),
+                            timestamp: new Date().toISOString(),
                             totalAmount: (table.bill || 0) * 1.05,
                             tableId,
                             items: orderItems.map(item => ({

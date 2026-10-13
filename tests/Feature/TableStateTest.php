@@ -4,6 +4,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+test('csrf token can be refreshed for an expired browser token', function () {
+    $this->getJson(route('csrf-token'))
+        ->assertSuccessful()
+        ->assertJsonStructure(['token'])
+        ->assertHeader('Cache-Control', 'no-store, private');
+});
+
 test('table statuses are stored centrally and returned in the floorplan format', function () {
     $this->getJson(route('tables.index'))
         ->assertSuccessful()

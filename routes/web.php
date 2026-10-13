@@ -5,12 +5,13 @@ use App\Http\Controllers\CustomerBookingController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReservationEmailController;
+use App\Http\Controllers\SalesShiftController;
 use App\Http\Controllers\TableStateController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('manager')->group(function () {
+Route::middleware(['auth', 'manager'])->prefix('manager')->group(function () {
     Route::get('/', function () {
         return view('manager.manager', ['activeTab' => 'analytics']);
     })->name('manager.home');
@@ -26,6 +27,18 @@ Route::prefix('manager')->group(function () {
     Route::get('/inventory', function () {
         return view('manager.manager', ['activeTab' => 'inventory']);
     })->name('manager.inventory');
+
+    Route::get('/sales-history', function () {
+        return view('manager.manager', ['activeTab' => 'saleshistory']);
+    })->name('manager.sales-history');
+});
+
+Route::middleware(['auth', 'manager'])->prefix('api/manager')->name('manager.api.')->group(function () {
+    Route::get('/sales-shift', [SalesShiftController::class, 'show'])->name('sales-shift.show');
+    Route::get('/sales-shift/export', [SalesShiftController::class, 'export'])->name('sales-shift.export');
+    Route::post('/sales-shift/start', [SalesShiftController::class, 'start'])->name('sales-shift.start');
+    Route::post('/sales-shift/close', [SalesShiftController::class, 'close'])->name('sales-shift.close');
+    Route::put('/sales-settings', [SalesShiftController::class, 'updateSettings'])->name('sales-settings.update');
 });
 
 Route::get('/api/products', [ProductController::class, 'index'])->name('products.index');
@@ -33,11 +46,19 @@ Route::post('/api/products', [ProductController::class, 'store'])->name('product
 Route::put('/api/products/{product}', [ProductController::class, 'update'])->name('products.update');
 Route::delete('/api/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 Route::post('/api/orders/complete', [ProductController::class, 'completeOrder'])->name('orders.complete');
+Route::middleware('auth')->post('/api/orders/settle-table/{tableNumber}', [SalesShiftController::class, 'settleTable'])
+    ->whereNumber('tableNumber')
+    ->name('orders.settle-table');
 Route::get('/api/tables', [TableStateController::class, 'index'])->name('tables.index');
 Route::put('/api/tables', [TableStateController::class, 'update'])->name('tables.update');
 Route::post('/api/tables/{tableNumber}/clear', [TableStateController::class, 'clear'])
     ->whereNumber('tableNumber')
     ->name('tables.clear');
+Route::get('/csrf-token', function () {
+    return response()
+        ->json(['token' => csrf_token()])
+        ->header('Cache-Control', 'no-store, private');
+})->name('csrf-token');
 
 Route::prefix('waiter')->group(function () {
 

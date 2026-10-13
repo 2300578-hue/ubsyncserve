@@ -265,11 +265,13 @@
                             };
                         });
 
+                        const csrfToken = await window.tableStateApi.refreshCsrfToken();
+
                         const response = await fetch('{{ route('orders.complete') }}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-CSRF-TOKEN': csrfToken,
                                 'Accept': 'application/json'
                             },
                             body: JSON.stringify({

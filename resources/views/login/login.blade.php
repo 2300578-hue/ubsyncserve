@@ -116,13 +116,13 @@
                     <div class="space-y-1.5">
                         <label class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">Email</label>
                         <input type="email" x-model="email" id="email" required
-                               class="custom-input" placeholder="Enter your email">
+                               class="custom-input" placeholder="">
                     </div>
 
                     <div class="space-y-1.5">
                         <label class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">Password</label>
                         <input :type="showPassword ? 'text' : 'password'" x-model="password" id="password" required
-                               class="custom-input" placeholder="Enter your password">
+                               class="custom-input" placeholder="">
                     </div>
 
                     <div class="flex flex-row items-center justify-between px-1">

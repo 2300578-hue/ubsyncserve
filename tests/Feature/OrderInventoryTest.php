@@ -1,11 +1,24 @@
 <?php
 
 use App\Models\Product;
+use App\Models\SalesShift;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    SalesShift::query()->create([
+        'started_by' => $manager->id,
+        'business_date' => now('Asia/Manila')->toDateString(),
+        'started_at' => now(),
+        'status' => 'open',
+    ]);
+});
 
 test('waiter orders are saved and decrement product stock', function () {
     $product = Product::create([
