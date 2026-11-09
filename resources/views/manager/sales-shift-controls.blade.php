@@ -21,23 +21,8 @@
                     class="mt-1 block rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
                     <option value="today">Today</option>
                     <option value="yesterday">Yesterday</option>
-                    <option value="custom">Custom range</option>
                 </select>
             </label>
-            <template x-if="salesPreset === 'custom'">
-                <div class="flex items-end gap-2">
-                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        From
-                        <input type="date" x-model="salesFromDate" @change="loadAnalytics()"
-                            class="mt-1 block rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
-                    </label>
-                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        To
-                        <input type="date" x-model="salesToDate" @change="loadAnalytics()"
-                            class="mt-1 block rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700">
-                    </label>
-                </div>
-            </template>
             <a :href="salesExportUrl"
                 class="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-xs font-black text-white hover:bg-slate-700">
                 <i class="fas fa-file-csv"></i> Excel / CSV

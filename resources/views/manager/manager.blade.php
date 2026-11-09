@@ -174,8 +174,6 @@
                voidCodeInput: '',
                managerCode: '1234',
                salesPreset: 'today',
-               salesFromDate: '',
-               salesToDate: '',
                businessDate: '',
                businessDayCutoff: '00:00',
                savedBusinessDayCutoff: '00:00',
@@ -303,10 +301,6 @@
 
                 get salesExportUrl() {
                     const params = new URLSearchParams({ preset: this.salesPreset });
-                    if (this.salesPreset === 'custom') {
-                        params.set('from', this.salesFromDate);
-                        params.set('to', this.salesToDate);
-                    }
 
                     return `{{ route('manager.api.sales-shift.export') }}?${params.toString()}`;
                 },
@@ -340,16 +334,8 @@
                 },
 
                 async loadAnalytics() {
-                    if (this.salesPreset === 'custom' && (!this.salesFromDate || !this.salesToDate)) {
-                        return;
-                    }
-
                     this.salesShiftError = '';
                     const params = new URLSearchParams({ preset: this.salesPreset });
-                    if (this.salesPreset === 'custom') {
-                        params.set('from', this.salesFromDate);
-                        params.set('to', this.salesToDate);
-                    }
 
                     try {
                         const response = await fetch(`{{ route('manager.api.sales-shift.show') }}?${params.toString()}`, {
@@ -370,10 +356,6 @@
                         this.salesShiftReport = result;
                         this.orderHistory = result.transactions || [];
                         this.salesSummary.total = Number(result.summary.total_sales || 0);
-                        if (this.salesPreset === 'custom') {
-                            this.salesFromDate = result.from;
-                            this.salesToDate = result.to;
-                        }
                     } catch (error) {
                         this.salesShiftError = error.message || 'Unable to load sales reports.';
                         this.currentShift = null;
