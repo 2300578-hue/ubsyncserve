@@ -71,7 +71,7 @@
                     <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                         <i class="fa-regular fa-envelope text-[#800000]/60 text-sm"></i>
                     </div>
-                    <input type="email" name="email" required class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 outline-none focus-maroon transition-all bg-white text-sm" placeholder="your@email.com">
+                    <input type="email" name="email" required class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 outline-none focus-maroon transition-all bg-white text-sm" placeholder="yourname@gmail.com">
                 </div>
             </div>
 
@@ -178,7 +178,7 @@
 
         const isValid =
             name.length > 0 &&
-            email.length > 0 && email.includes('@') &&
+            /^[^@\s]+@gmail\.com$/i.test(email) &&
             phone.length > 0 &&
             date.length > 0 &&
             time.length > 0 &&

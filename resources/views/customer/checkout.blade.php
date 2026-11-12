@@ -113,19 +113,31 @@
 
                     <div class="rounded-[2rem] bg-white p-6 shadow-sm border border-gray-200">
                         <h2 class="text-xl font-black uppercase tracking-tight text-gray-900">Payment Method</h2>
-                        <div class="mt-5 rounded-[1.5rem] border-2 border-[#800000] bg-[#fff4f4]">
-                            <div class="flex items-center gap-4 p-4">
+                        <div class="mt-5 space-y-3">
+                            <label :class="paymentMethod === 'gcash' ? 'border-[#800000] bg-[#fff4f4]' : 'border-gray-200 bg-white'" class="flex cursor-pointer items-center gap-4 rounded-[1.5rem] border-2 p-4">
+                                <input type="radio" name="payment_method" value="gcash" x-model="paymentMethod" class="sr-only">
                                 <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500 text-white shadow-sm"><i class="fas fa-mobile-screen-button"></i></span>
                                 <div>
                                     <p class="font-black uppercase text-gray-900">GCash</p>
                                     <p class="text-xs text-gray-500">GCash payment will be confirmed by staff.</p>
                                 </div>
-                                <div class="ml-auto text-[#800000]">
+                                <div x-show="paymentMethod === 'gcash'" class="ml-auto text-[#800000]">
                                     <i class="fas fa-check-circle text-xl"></i>
                                 </div>
-                            </div>
+                            </label>
+                            <label :class="paymentMethod === 'paymaya' ? 'border-[#800000] bg-[#fff4f4]' : 'border-gray-200 bg-white'" class="flex cursor-pointer items-center gap-4 rounded-[1.5rem] border-2 p-4">
+                                <input type="radio" name="payment_method" value="paymaya" x-model="paymentMethod" class="sr-only">
+                                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm"><i class="fas fa-wallet"></i></span>
+                                <div>
+                                    <p class="font-black uppercase text-gray-900">PayMaya</p>
+                                    <p class="text-xs text-gray-500">PayMaya payment will be confirmed by staff.</p>
+                                </div>
+                                <div x-show="paymentMethod === 'paymaya'" class="ml-auto text-[#800000]">
+                                    <i class="fas fa-check-circle text-xl"></i>
+                                </div>
+                            </label>
                         </div>
-                        <p class="mt-3 text-xs text-gray-500">Online GCash processing is not configured yet. Do not send payment until staff provides instructions.</p>
+                        <p class="mt-3 text-xs text-gray-500">Online payment processing is not configured yet. Do not send payment until staff provides instructions.</p>
                     </div>
 
                     <p x-show="orderError" x-text="orderError" class="rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700" role="alert"></p>
@@ -142,13 +154,13 @@
                     <i class="fas fa-check text-4xl"></i>
                 </div>
                 <h2 class="text-2xl font-black uppercase text-gray-900">Order Confirmed!</h2>
-                <p class="mt-2 text-sm text-gray-500">Your order has been submitted. It will appear in Performance Analytics after staff confirms your GCash payment. Online payment processing is not configured yet.</p>
+                <p class="mt-2 text-sm text-gray-500">Your order has been submitted. It will appear in Performance Analytics after staff confirms your payment. Online payment processing is not configured yet.</p>
                 
                 <div class="mt-6 rounded-[1.5rem] bg-gray-50 p-5 text-left border border-gray-100">
                    <p class="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-4 border-b border-gray-200 pb-3">Receipt Summary</p>
                     <div class="space-y-2">
                         <div class="flex justify-between"><span class="text-sm text-gray-500">Table:</span> <span class="text-sm font-black text-gray-900" x-text="tableNumber ? 'TABLE ' + tableNumber : 'UNASSIGNED'"></span></div>
-                        <div class="flex justify-between"><span class="text-sm text-gray-500">Method:</span> <span class="text-sm font-black text-gray-900">GCash (pending confirmation)</span></div>
+                        <div class="flex justify-between"><span class="text-sm text-gray-500">Method:</span> <span class="text-sm font-black text-gray-900" x-text="paymentMethodLabel + ' (pending confirmation)'"></span></div>
                         <div class="flex justify-between pb-2 border-b border-gray-200"><span class="text-sm text-gray-500">Subtotal:</span> <span class="text-sm font-black text-gray-900" x-text="formatCurrency(cartTotal)"></span></div>
                         <div class="flex justify-between pb-2"><span class="text-sm text-gray-500">VAT (5%):</span> <span class="text-sm font-black text-gray-900" x-text="formatCurrency(cartTotal * 0.05)"></span></div>
                         <div class="flex justify-between pt-2 border-t border-gray-200 mt-2"><span class="text-base font-bold text-gray-900">Order Total:</span> <span class="text-base font-black text-[#800000]" x-text="formatCurrency(cartTotal * 1.05)"></span></div>
@@ -169,6 +181,9 @@
                 tableNumber: null,
                 guestCount: 0,
                 paymentMethod: 'gcash',
+                get paymentMethodLabel() {
+                    return this.paymentMethod === 'paymaya' ? 'PayMaya' : 'GCash';
+                },
                 bookingType: 'dine-in',
                 orderComplete: false,
                 isSubmittingOrder: false,
@@ -189,12 +204,34 @@
                     }
                     this.tableNumber = savedTable || null;
                     this.bookingType = savedBookingType;
+                    const savedPaymentMethod = localStorage.getItem('customer_payment_method');
+                    if (['gcash', 'paymaya'].includes(savedPaymentMethod)) {
+                        this.paymentMethod = savedPaymentMethod;
+                    }
 
                     const savedAdults = parseInt(localStorage.getItem('customer_guests_adults'), 10);
                     const savedChildren = parseInt(localStorage.getItem('customer_guests_children'), 10);
 
                     let adults = Number.isInteger(savedAdults) ? savedAdults : 0;
                     let children = Number.isInteger(savedChildren) ? savedChildren : 0;
+
+                    try {
+                        const submittedOrder = JSON.parse(localStorage.getItem('customer_last_submitted_order') || 'null');
+                        if (submittedOrder?.status === 'submitted' && submittedOrder.tableId) {
+                            this.tableNumber = String(submittedOrder.tableId);
+                            if (['gcash', 'paymaya'].includes(submittedOrder.paymentMethod)) {
+                                this.paymentMethod = submittedOrder.paymentMethod;
+                            }
+                            this.serverSubtotal = Number.isFinite(Number(submittedOrder.subtotal))
+                                ? Number(submittedOrder.subtotal)
+                                : null;
+                            this.guestCount = adults + children;
+                            this.orderComplete = true;
+                            return;
+                        }
+                    } catch (error) {
+                        localStorage.removeItem('customer_last_submitted_order');
+                    }
 
                     if (adults === 0 && children === 0 && this.tableNumber) {
                         const storedTables = await window.tableStateApi.load();
@@ -266,6 +303,7 @@
                         });
 
                         const csrfToken = await window.tableStateApi.refreshCsrfToken();
+                        localStorage.setItem('customer_payment_method', this.paymentMethod);
 
                         const response = await fetch('{{ route('orders.complete') }}', {
                             method: 'POST',
@@ -277,6 +315,7 @@
                             body: JSON.stringify({
                                 table_number: tableId,
                                 booking_type: this.bookingType === 'advance-order' ? 'advance-order' : null,
+                                payment_method: this.paymentMethod,
                                 adults,
                                 children,
                                 items: this.cart.map(item => ({
@@ -292,6 +331,14 @@
                             throw new Error(validationMessage || result.message || 'Unable to submit your order.');
                         }
 
+                        localStorage.setItem('customer_last_submitted_order', JSON.stringify({
+                            status: 'submitted',
+                            tableId,
+                            orderNumber: result.order_number,
+                            paymentMethod: this.paymentMethod,
+                            subtotal: Number(result.subtotal_amount)
+                        }));
+                        localStorage.removeItem('customer_pending_table_selection');
                         this.serverSubtotal = Number(result.subtotal_amount);
                         const subtotal = this.cartTotal;
                         this.orderComplete = true;
@@ -305,7 +352,7 @@
                                 vat: subtotal * 0.05,
                                 totalAmount: subtotal * 1.05,
                                 tableId,
-                                paymentMethod: 'gcash',
+                                paymentMethod: this.paymentMethod,
                                 bookingType: this.bookingType,
                                 items: orderItems,
                                 status: 'pending'
@@ -325,8 +372,12 @@
                 clearOrder() {
                     localStorage.removeItem('customer_order_cart');
                     localStorage.removeItem('customer_order_table');
+                    localStorage.removeItem('customer_pending_table_selection');
                     localStorage.removeItem('customer_guests_adults');
                     localStorage.removeItem('customer_guests_children');
+                    localStorage.removeItem('customer_booking_type');
+                    localStorage.removeItem('customer_payment_method');
+                    localStorage.removeItem('customer_last_submitted_order');
                     window.location.href = "{{ route('order.qrcodes') }}";
                 }
             };

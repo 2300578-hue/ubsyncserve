@@ -224,9 +224,9 @@ class SalesShiftController extends Controller
     {
         abort_unless(in_array($request->user()?->role, ['manager', 'waiter'], true), 403);
         $data = $request->validate([
-            'payment_method' => ['sometimes', 'nullable', 'in:cash,gcash'],
+            'payment_method' => ['sometimes', 'nullable', 'in:cash,gcash,paymaya'],
         ]);
-        $paymentMethod = $data['payment_method'] ?? 'cash';
+        $paymentMethod = $data['payment_method'] ?? null;
         $this->ensureReportingSchema();
 
         $paidOrders = $this->settlePendingOrdersForTable((string) $tableNumber, $paymentMethod);
@@ -236,7 +236,7 @@ class SalesShiftController extends Controller
         ]);
     }
 
-    private function settlePendingOrdersForTable(?string $tableNumber, string $paymentMethod): EloquentCollection
+    private function settlePendingOrdersForTable(?string $tableNumber, ?string $paymentMethod): EloquentCollection
     {
         return DB::transaction(function () use ($tableNumber, $paymentMethod): EloquentCollection {
             $shift = SalesShift::query()
@@ -268,7 +268,7 @@ class SalesShiftController extends Controller
             foreach ($orders as $order) {
                 $order->update([
                     'status' => 'completed',
-                    'payment_method' => $paymentMethod,
+                    'payment_method' => $paymentMethod ?? $order->payment_method ?? 'cash',
                     'paid_at' => now(),
                 ]);
             }

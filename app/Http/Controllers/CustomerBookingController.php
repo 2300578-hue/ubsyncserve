@@ -5,13 +5,17 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class CustomerBookingController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $this->authorizeStaff($request);
+
         $bookings = DB::table('customer_bookings')
             ->whereIn('status', ['pending', 'confirmed'])
             ->whereNull('archived_at')
@@ -36,12 +40,34 @@ class CustomerBookingController extends Controller
         return response()->json($bookings);
     }
 
+    public function tableDetails(string $bookingReference): JsonResponse
+    {
+        $booking = DB::table('customer_bookings')
+            ->where('booking_reference', $bookingReference)
+            ->where('status', 'confirmed')
+            ->whereNull('archived_at')
+            ->first(['booking_reference', 'type', 'adults', 'children', 'guests', 'status']);
+
+        if ($booking === null) {
+            return response()->json(['message' => 'Confirmed reservation not found.'], 404);
+        }
+
+        return response()->json([
+            'id' => $booking->booking_reference,
+            'type' => $booking->type,
+            'adults' => (int) $booking->adults,
+            'children' => (int) $booking->children,
+            'guests' => (int) $booking->guests,
+            'status' => $booking->status,
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'type' => ['required', Rule::in(['advance-order', 'table-reservation'])],
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255'],
+            'email' => ['required', 'email:filter', 'max:255', 'regex:/\A[^@\s]+@gmail\.com\z/i'],
             'phone' => ['required', 'string', 'max:50'],
             'date' => ['required', 'date', 'after_or_equal:today'],
             'time' => ['required', 'date_format:H:i'],
@@ -56,6 +82,13 @@ class CustomerBookingController extends Controller
             return response()->json([
                 'message' => 'At least one guest is required.',
             ], 422);
+        }
+
+        $normalizedEmail = $this->normalizeGmailAddress($validated['email']);
+        if ($normalizedEmail !== null && $this->hasConfirmedReservationEmail($normalizedEmail)) {
+            throw ValidationException::withMessages([
+                'email' => ['This Gmail account already has a confirmed reservation.'],
+            ]);
         }
 
         $booking = DB::table('customer_bookings')->insertGetId([
@@ -83,62 +116,209 @@ class CustomerBookingController extends Controller
 
     public function updateStatus(Request $request, string $bookingReference): JsonResponse
     {
+        $this->authorizeStaff($request);
+
         $validated = $request->validate([
             'status' => ['required', Rule::in(['confirmed', 'cancelled'])],
         ]);
 
-        $updated = DB::table('customer_bookings')
-            ->where('booking_reference', $bookingReference)
-            ->whereNull('archived_at')
-            ->where('status', 'pending')
-            ->update([
-                'status' => $validated['status'],
-                'updated_at' => now(),
-            ]);
-
-        if ($updated === 0) {
+        $result = DB::transaction(function () use ($bookingReference, $validated): array {
             $booking = DB::table('customer_bookings')
                 ->where('booking_reference', $bookingReference)
+                ->whereNull('archived_at')
+                ->lockForUpdate()
                 ->first();
 
             if (! $booking) {
-                return response()->json(['message' => 'Reservation not found.'], 404);
+                return ['message' => 'Reservation not found.', 'http_status' => 404];
             }
 
-            return response()->json([
-                'message' => 'Reservation has already been processed.',
-                'status' => $booking->status,
-            ], 409);
-        }
+            if ($booking->status !== 'pending') {
+                return [
+                    'message' => 'Reservation has already been processed.',
+                    'status' => $booking->status,
+                    'http_status' => 409,
+                ];
+            }
 
-        return response()->json(['success' => true, 'status' => $validated['status']]);
+            if ($validated['status'] === 'confirmed') {
+                $normalizedEmail = $this->normalizeGmailAddress($booking->email);
+                if ($normalizedEmail !== null) {
+                    if (Schema::hasTable('confirmed_reservation_emails')) {
+                        $now = now();
+
+                        $emailClaim = DB::table('confirmed_reservation_emails')
+                            ->where('normalized_email', $normalizedEmail)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($emailClaim !== null && $emailClaim->booking_reference !== $bookingReference) {
+                            $claimIsActive = DB::table('customer_bookings')
+                                ->where('booking_reference', $emailClaim->booking_reference)
+                                ->whereNull('archived_at')
+                                ->exists();
+
+                            if ($claimIsActive) {
+                                return [
+                                    'message' => 'This Gmail account already has a confirmed reservation.',
+                                    'http_status' => 409,
+                                ];
+                            }
+
+                            DB::table('confirmed_reservation_emails')
+                                ->where('normalized_email', $normalizedEmail)
+                                ->where('booking_reference', $emailClaim->booking_reference)
+                                ->delete();
+                        }
+
+                        DB::table('confirmed_reservation_emails')->insertOrIgnore([
+                            'normalized_email' => $normalizedEmail,
+                            'booking_reference' => $bookingReference,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ]);
+
+                        $emailClaim = DB::table('confirmed_reservation_emails')
+                            ->where('normalized_email', $normalizedEmail)
+                            ->first();
+
+                        $emailAlreadyClaimed = $emailClaim === null
+                            || $emailClaim->booking_reference !== $bookingReference;
+                    } else {
+                        $emailAlreadyClaimed = DB::table('customer_bookings')
+                            ->where('status', 'confirmed')
+                            ->whereNull('archived_at')
+                            ->where('id', '!=', $booking->id)
+                            ->pluck('email')
+                            ->contains(fn (string $email): bool => $this->normalizeGmailAddress($email) === $normalizedEmail);
+                    }
+
+                    if ($emailAlreadyClaimed) {
+                        return [
+                            'message' => 'This Gmail account already has a confirmed reservation.',
+                            'http_status' => 409,
+                        ];
+                    }
+                }
+            }
+
+            DB::table('customer_bookings')
+                ->where('id', $booking->id)
+                ->update([
+                    'status' => $validated['status'],
+                    'updated_at' => now(),
+                ]);
+
+            return ['success' => true, 'status' => $validated['status'], 'http_status' => 200];
+        });
+
+        $httpStatus = $result['http_status'];
+        unset($result['http_status']);
+
+        return response()->json($result, $httpStatus);
     }
 
-    public function archive(string $bookingReference): JsonResponse
+    public function archive(Request $request, string $bookingReference): JsonResponse
     {
-        $updated = DB::table('customer_bookings')
-            ->where('booking_reference', $bookingReference)
-            ->whereNull('archived_at')
-            ->update([
-                'archived_at' => now(),
-                'updated_at' => now(),
-            ]);
+        $this->authorizeStaff($request);
 
-        return $updated > 0
+        $archived = DB::transaction(function () use ($bookingReference): bool {
+            $booking = DB::table('customer_bookings')
+                ->where('booking_reference', $bookingReference)
+                ->whereNull('archived_at')
+                ->lockForUpdate()
+                ->first(['id', 'booking_reference']);
+
+            if ($booking === null) {
+                return false;
+            }
+
+            DB::table('customer_bookings')
+                ->where('id', $booking->id)
+                ->update([
+                    'archived_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            if (Schema::hasTable('confirmed_reservation_emails')) {
+                DB::table('confirmed_reservation_emails')
+                    ->where('booking_reference', $booking->booking_reference)
+                    ->delete();
+            }
+
+            return true;
+        });
+
+        return $archived
             ? response()->json(['success' => true])
             : response()->json(['message' => 'Reservation not found.'], 404);
     }
 
-    public function archiveAll(): JsonResponse
+    public function archiveAll(Request $request): JsonResponse
     {
-        DB::table('customer_bookings')
-            ->whereNull('archived_at')
-            ->whereIn('status', ['pending', 'confirmed', 'cancelled'])
-            ->update([
-                'archived_at' => now(),
-                'updated_at' => now(),
-            ]);
+        $this->authorizeStaff($request);
+
+        DB::transaction(function (): void {
+            $bookingReferences = DB::table('customer_bookings')
+                ->whereNull('archived_at')
+                ->whereIn('status', ['pending', 'confirmed', 'cancelled'])
+                ->lockForUpdate()
+                ->pluck('booking_reference');
+
+            if ($bookingReferences->isEmpty()) {
+                return;
+            }
+
+            DB::table('customer_bookings')
+                ->whereIn('booking_reference', $bookingReferences)
+                ->whereNull('archived_at')
+                ->update([
+                    'archived_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            if (Schema::hasTable('confirmed_reservation_emails')) {
+                DB::table('confirmed_reservation_emails')
+                    ->whereIn('booking_reference', $bookingReferences)
+                    ->delete();
+            }
+        });
 
         return response()->json(['success' => true]);
+    }
+
+    private function normalizeGmailAddress(string $email): ?string
+    {
+        $email = Str::lower(trim($email));
+        if (! str_ends_with($email, '@gmail.com')) {
+            return null;
+        }
+
+        [$localPart] = explode('@', $email, 2);
+        $localPart = explode('+', $localPart, 2)[0];
+
+        return str_replace('.', '', $localPart).'@gmail.com';
+    }
+
+    private function hasConfirmedReservationEmail(string $normalizedEmail): bool
+    {
+        if (Schema::hasTable('confirmed_reservation_emails')) {
+            return DB::table('confirmed_reservation_emails as claims')
+                ->join('customer_bookings as bookings', 'bookings.booking_reference', '=', 'claims.booking_reference')
+                ->where('claims.normalized_email', $normalizedEmail)
+                ->whereNull('bookings.archived_at')
+                ->exists();
+        }
+
+        return DB::table('customer_bookings')
+            ->where('status', 'confirmed')
+            ->whereNull('archived_at')
+            ->pluck('email')
+            ->contains(fn (string $email): bool => $this->normalizeGmailAddress($email) === $normalizedEmail);
+    }
+
+    private function authorizeStaff(Request $request): void
+    {
+        abort_unless(in_array($request->user()?->role, ['manager', 'waiter'], true), 403);
     }
 }

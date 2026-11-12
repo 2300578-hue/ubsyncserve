@@ -12,6 +12,8 @@ class ReservationEmailController extends Controller
 {
     public function confirmEmail(Request $request): JsonResponse
     {
+        abort_unless(in_array($request->user()?->role, ['manager', 'waiter'], true), 403);
+
         $data = $request->validate([
             'id' => ['required', 'string'],
             'name' => ['required', 'string'],

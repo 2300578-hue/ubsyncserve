@@ -86,8 +86,9 @@
                     <button @click="switchTab('home')" class="px-6 py-2.5 bg-[#800000] text-white rounded-full font-bold text-sm uppercase tracking-wider shadow-lg hover:shadow-xl transition-all">
                         Overview
                     </button>
-                    <button @click="switchTab('reservations')" class="px-6 py-2.5 bg-slate-200 text-slate-700 rounded-full font-bold text-sm uppercase tracking-wider hover:bg-slate-300 transition-all">
+                    <button @click="switchTab('reservations')" class="relative px-6 py-2.5 bg-slate-200 text-slate-700 rounded-full font-bold text-sm uppercase tracking-wider hover:bg-slate-300 transition-all">
                         Reservations
+                        <span x-show="reservations.filter(reservation => String(reservation.status).toLowerCase() === 'pending').length > 0" x-cloak x-text="reservations.filter(reservation => String(reservation.status).toLowerCase() === 'pending').length" class="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center shadow"></span>
                     </button>
                 </div>
             </div>
@@ -209,6 +210,24 @@
             @include('waiter.reservation')
         </div>
     </main>
+
+    <div x-show="reservationToast" x-cloak role="status" aria-live="polite" class="fixed right-4 top-20 z-[2100] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl">
+        <div class="flex items-start gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <i class="fas fa-bell"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="font-black text-slate-900">New reservation</p>
+                <p class="mt-1 text-sm text-slate-600" x-text="reservationToast"></p>
+                <button @click="switchTab('reservations')" class="mt-3 text-xs font-black uppercase tracking-wide text-[#800000]">
+                    View reservations
+                </button>
+            </div>
+            <button @click="reservationToast = ''" aria-label="Dismiss notification" class="text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
 
  <div x-show="showSetupModal" x-cloak 
     x-transition:enter="transition ease-out duration-300"
@@ -427,13 +446,9 @@
                 </template>
             </div>
             
-            <div class="grid grid-cols-2 gap-4 pt-2">
-                <button @click="clearTable(selectedTable?.tableNumber || selectedTable?.id)"
-                    class="py-4 bg-emerald-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-wider shadow-lg shadow-emerald-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-check-circle text-sm"></i> Finish
-                </button>
+            <div class="pt-2">
                 <button @click="showReservedModal = false"
-                    class="py-4 bg-slate-800 text-white rounded-2xl font-black text-[11px] uppercase tracking-wider shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2">
+                    class="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-[11px] uppercase tracking-wider shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2">
                     Close
                 </button>
             </div>
@@ -729,6 +744,10 @@ function waiterSystem() {
         tableSyncError: '',
         isRefreshingFloorplan: false,
         reservations: [],
+        reservationNotifications: [],
+        reservationToast: '',
+        hasLoadedDatabaseReservations: false,
+        isLoadingReservations: false,
         processingReservations: {},
         guestSetup: { adults: 0, children: 0 },
         salesSummary: { total: 0 },
@@ -845,29 +864,6 @@ function waiterSystem() {
             }
         },
 
-        async clearTable(tableId) {
-            const index = this.tables.findIndex(t => t.id === tableId);
-            if (index !== -1) {
-                this.tables[index].status = 'available';
-                this.tables[index].adults = 0;
-                this.tables[index].children = 0;
-                this.tables[index].guests = 0;
-                this.tables[index].bill = 0;
-                this.tables[index].isPaid = false;
-                this.tables[index].startTime = null;
-                this.tables[index].orders = [];
-
-                await window.tableStateApi.save([this.tables[index]]);
-                this.showOrderModal = false;
-                this.showReservedModal = false;
-                this.showAdvanceOrderModal = false;
-                this.advanceOrderSentToKitchen = false;
-                this.selectedTable = null;
-                let kOrders = JSON.parse(localStorage.getItem('ub_kitchen_orders') || '[]');
-                let filteredK = kOrders.filter(ko => ko.table != tableId);
-                localStorage.setItem('ub_kitchen_orders', JSON.stringify(filteredK));
-            }
-        },
 async startSession() {
             // VALIDATION: Check if both Adults and Children are 0
             if (this.guestSetup.adults <= 0 && this.guestSetup.children <= 0) {
@@ -916,30 +912,70 @@ async startSession() {
         },
 
         // --- RESERVATION FUNCTIONS ---
-     async loadReservations() {
-    try {
-        const response = await fetch('/bookings', {
-            headers: { 'Accept': 'application/json' }
-        });
+        async loadReservations() {
+            if (this.isLoadingReservations || document.hidden) {
+                return;
+            }
 
-        if (response.ok) {
-            this.reservations = await response.json();
-            return;
-        }
-    } catch (error) {
-        console.warn('Unable to load database bookings:', error);
-    }
+            this.isLoadingReservations = true;
+            try {
+                const response = await fetch('/bookings', {
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
 
-    const stored = localStorage.getItem('ub_reservations');
-    const rawData = stored ? JSON.parse(stored) : [];
-    this.reservations = rawData.map(res => ({
-        ...res,
-        status: res.status ? res.status.toLowerCase() : 'pending',
-        createdAt: res.createdAt || res.created_at || null,
-        table: res.table || null,
-        type: res.type || 'table-reservation'
-    }));
-},
+                if (!response.ok) {
+                    throw new Error('Unable to refresh reservations.');
+                }
+
+                const reservations = await response.json();
+                if (this.hasLoadedDatabaseReservations) {
+                    const previousReservationIds = new Set(this.reservations.map(reservation => reservation.id));
+                    const newPendingReservations = reservations.filter(reservation =>
+                        reservation.status === 'pending'
+                        && !previousReservationIds.has(reservation.id)
+                        && !this.reservationNotifications.some(notification => notification.id === reservation.id)
+                    );
+
+                    newPendingReservations.forEach(reservation => {
+                        this.reservationNotifications.push({
+                            id: reservation.id,
+                            name: reservation.name
+                        });
+                    });
+
+                    if (newPendingReservations.length > 0) {
+                        const latestReservation = newPendingReservations[newPendingReservations.length - 1];
+                        this.reservationToast = newPendingReservations.length === 1
+                            ? `${latestReservation.name} submitted a new reservation.`
+                            : `${newPendingReservations.length} new reservations have arrived.`;
+                    }
+                }
+
+                this.reservations = reservations;
+                this.hasLoadedDatabaseReservations = true;
+            } catch (error) {
+                console.warn('Unable to load database bookings:', error);
+                if (!this.hasLoadedDatabaseReservations) {
+                    try {
+                        const stored = localStorage.getItem('ub_reservations');
+                        const rawData = stored ? JSON.parse(stored) : [];
+                        this.reservations = rawData.map(res => ({
+                            ...res,
+                            status: res.status ? res.status.toLowerCase() : 'pending',
+                            createdAt: res.createdAt || res.created_at || null,
+                            table: res.table || null,
+                            type: res.type || 'table-reservation'
+                        }));
+                    } catch (storageError) {
+                        console.warn('Unable to load locally stored reservations:', storageError);
+                        this.reservations = [];
+                    }
+                }
+            } finally {
+                this.isLoadingReservations = false;
+            }
+        },
 
         async confirmReservation(resId) {
             const index = this.reservations.findIndex(r => r.id === resId);
@@ -1103,6 +1139,10 @@ async startSession() {
 
         switchTab(target) {
             this.tab = target;
+            if (target === 'reservations') {
+                this.reservationNotifications = [];
+                this.reservationToast = '';
+            }
             if (window.innerWidth < 768) this.sidebarOpen = false;
         },
 

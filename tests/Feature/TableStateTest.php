@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -54,6 +55,42 @@ test('table status updates reject invalid statuses and duplicate table numbers',
             ['id' => 1, 'status' => 'available'],
         ],
     ])->assertUnprocessable();
+});
+
+test('empty advance selections are reset instead of showing zero guests', function () {
+    $this->getJson(route('tables.index'))->assertSuccessful();
+
+    DB::table('restaurant_tables')
+        ->where('table_number', 1)
+        ->update([
+            'status' => 'reserved-advance',
+            'adults' => 0,
+            'children' => 0,
+            'guests' => 0,
+            'bill' => 0,
+            'orders' => json_encode([]),
+        ]);
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonPath('0.status', 'available')
+        ->assertJsonPath('0.guests', 0);
+});
+
+test('an empty advance selection cannot be saved as reserved', function () {
+    $this->putJson(route('tables.update'), [
+        'tables' => [
+            [
+                'id' => 1,
+                'status' => 'reserved-advance',
+                'adults' => 0,
+                'children' => 0,
+                'guests' => 0,
+                'orders' => [],
+            ],
+        ],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('tables');
 });
 
 test('paid table can be cleared with a single table-specific request', function () {

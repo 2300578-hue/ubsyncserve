@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TableStateController extends Controller
 {
@@ -26,6 +27,8 @@ class TableStateController extends Controller
                 ->all()
         );
 
+        $this->clearEmptyAdvanceSelections();
+
         $tables = DB::table('restaurant_tables')
             ->orderBy('table_number')
             ->get()
@@ -42,6 +45,40 @@ class TableStateController extends Controller
             ]);
 
         return response()->json($tables);
+    }
+
+    private function clearEmptyAdvanceSelections(): void
+    {
+        $emptyAdvanceSelections = DB::table('restaurant_tables')
+            ->where('status', 'reserved-advance')
+            ->where('is_paid', false)
+            ->where('adults', 0)
+            ->where('children', 0)
+            ->where('guests', 0)
+            ->where('bill', 0)
+            ->get(['table_number', 'orders']);
+
+        foreach ($emptyAdvanceSelections as $table) {
+            $orders = json_decode($table->orders, true, flags: JSON_THROW_ON_ERROR);
+            if (is_array($orders) && $orders !== []) {
+                continue;
+            }
+
+            DB::table('restaurant_tables')
+                ->where('table_number', $table->table_number)
+                ->where('status', 'reserved-advance')
+                ->where('is_paid', false)
+                ->where('adults', 0)
+                ->where('children', 0)
+                ->where('guests', 0)
+                ->where('bill', 0)
+                ->where('orders', $table->orders)
+                ->update([
+                    'status' => 'available',
+                    'start_time' => null,
+                    'updated_at' => now(),
+                ]);
+        }
     }
 
     public function update(Request $request): JsonResponse
@@ -79,6 +116,15 @@ class TableStateController extends Controller
                     ->where('table_number', $table['id'])
                     ->lockForUpdate()
                     ->first();
+
+                $resultingGuests = $table['guests'] ?? (int) $currentTable->guests;
+                $resultingOrders = $table['orders']
+                    ?? json_decode($currentTable->orders, true, flags: JSON_THROW_ON_ERROR);
+                if ($table['status'] === 'reserved-advance' && $resultingGuests < 1 && $resultingOrders === []) {
+                    throw ValidationException::withMessages([
+                        'tables' => ["Table {$table['id']} cannot be marked as an advance order without guests or order items."],
+                    ]);
+                }
 
                 if (
                     ($currentTable->status === 'paid' || (bool) $currentTable->is_paid)

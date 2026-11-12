@@ -22,7 +22,7 @@
             <div class="bg-maroon p-4 sm:p-6 md:p-8 text-center text-white relative overflow-hidden">
                 <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                 <h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black uppercase tracking-widest relative z-10">Select Your Table</h1>
-                <p class="relative z-10 mt-1 sm:mt-2 text-xs sm:text-sm md:text-base text-white/80" x-text="currentReservation ? 'Complete your reservation for ' + currentReservation.name : (bookingType === 'advance-order' ? 'Choose a table for your advance order' : 'Choose a table for your table reservation')"></p>
+                <p class="relative z-10 mt-1 sm:mt-2 text-xs sm:text-sm md:text-base text-white/80" x-text="currentReservation ? 'Complete your confirmed reservation' : (bookingType === 'advance-order' ? 'Choose a table for your advance order' : 'Choose a table for your table reservation')"></p>
             </div>
             <div class="p-4 sm:p-6 md:p-8">
                 <div class="flex flex-wrap gap-4 text-sm font-black">
@@ -131,19 +131,61 @@
 
                 async init() {
                     const params = new URLSearchParams(window.location.search);
-                    this.bookingType = params.get('type') || 'advance-order';
-                    const resId = params.get('resId');
-                    const response = await fetch('/bookings', {
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    if (!response.ok) {
-                        throw new Error('Unable to load reservation details.');
+                    this.bookingType = params.get('type') || localStorage.getItem('customer_booking_type') || 'advance-order';
+                    let submittedOrder = null;
+                    try {
+                        submittedOrder = JSON.parse(localStorage.getItem('customer_last_submitted_order') || 'null');
+                    } catch (error) {
+                        localStorage.removeItem('customer_last_submitted_order');
                     }
-                    const reservations = await response.json();
-                    this.currentReservation = resId
-                        ? reservations.find(r => r.id === resId) || null
-                        : reservations.find(r => r.type === this.bookingType && r.status === 'pending') || null;
+                    if (submittedOrder?.status === 'submitted' && submittedOrder.tableId) {
+                        window.location.replace(`{{ route('order.checkout') }}`);
+                        return;
+                    }
+
+                    const resId = params.get('resId');
+                    if (resId) {
+                        const response = await fetch(`/booking/${encodeURIComponent(resId)}/table-details`, {
+                            headers: { 'Accept': 'application/json' }
+                        });
+                        if (!response.ok) {
+                            throw new Error('Unable to load confirmed reservation details.');
+                        }
+                        this.currentReservation = await response.json();
+                    }
+
                     await this.loadTables();
+
+                    let pendingSelection = null;
+                    try {
+                        pendingSelection = JSON.parse(localStorage.getItem('customer_pending_table_selection') || 'null');
+                    } catch (error) {
+                        localStorage.removeItem('customer_pending_table_selection');
+                    }
+                    if (
+                        pendingSelection?.bookingType === 'advance-order'
+                        && pendingSelection.tableId
+                        && this.bookingType === 'advance-order'
+                    ) {
+                        const pendingTable = this.tables.find(table => table.id === Number(pendingSelection.tableId));
+                        if (pendingTable?.status === 'available') {
+                            window.location.replace(`{{ route('order.menu') }}?table=${pendingTable.id}`);
+                            return;
+                        }
+
+                        if (pendingTable?.orders?.length > 0) {
+                            localStorage.setItem('customer_last_submitted_order', JSON.stringify({
+                                status: 'submitted',
+                                tableId: pendingTable.id,
+                                paymentMethod: localStorage.getItem('customer_payment_method') || 'gcash'
+                            }));
+                            window.location.replace(`{{ route('order.checkout') }}`);
+                            return;
+                        }
+
+                        localStorage.removeItem('customer_pending_table_selection');
+                        localStorage.removeItem('customer_order_table');
+                    }
                 },
 
                 async loadTables() {
@@ -205,15 +247,24 @@
                     }
 
                     const selectedTable = storedTables[tableIndex];
-                    selectedTable.status = this.bookingType === 'advance-order' ? 'reserved-advance' : 'reserved-booking';
-                    selectedTable.adults = Number(this.currentReservation?.adults || 0);
-                    selectedTable.children = Number(this.currentReservation?.children || 0);
-                    selectedTable.guests = selectedTable.adults + selectedTable.children;
-
-                    await window.tableStateApi.save([selectedTable]);
                     if (this.bookingType === 'advance-order') {
+                        const adults = Number(this.currentReservation?.adults || 0);
+                        const children = Number(this.currentReservation?.children || 0);
+                        localStorage.setItem('customer_order_table', String(selectedTable.id));
+                        localStorage.setItem('customer_guests_adults', String(adults));
+                        localStorage.setItem('customer_guests_children', String(children));
+                        localStorage.setItem('customer_booking_type', 'advance-order');
+                        localStorage.setItem('customer_pending_table_selection', JSON.stringify({
+                            tableId: selectedTable.id,
+                            bookingType: 'advance-order'
+                        }));
                         window.location.href = `{{ route('order.menu') }}?table=` + this.selectedTable.id;
                     } else {
+                        selectedTable.status = 'reserved-booking';
+                        selectedTable.adults = Number(this.currentReservation?.adults || 0);
+                        selectedTable.children = Number(this.currentReservation?.children || 0);
+                        selectedTable.guests = selectedTable.adults + selectedTable.children;
+                        await window.tableStateApi.save([selectedTable]);
                         await this.loadTables();
                     }
                     this.showConfirmModal = false;

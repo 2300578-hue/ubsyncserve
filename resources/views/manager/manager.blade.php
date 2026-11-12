@@ -105,11 +105,13 @@
             </button>
 
 
-            <button @click="tab = 'reservations'"
-    class="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-sm"
-    :class="tab === 'reservations' ? 'bg-red-50 text-[#800000] font-black' : 'text-slate-500 hover:bg-slate-50 font-bold'">
-    <i class="fas fa-calendar-check w-5"></i> Reservations
-</button>
+            <button @click="openReservations()"
+                class="relative w-full flex items-center gap-3 p-3 rounded-xl transition-all text-sm"
+                :class="tab === 'reservations' ? 'bg-red-50 text-[#800000] font-black' : 'text-slate-500 hover:bg-slate-50 font-bold'">
+                <i class="fas fa-calendar-check w-5"></i> Reservations
+                <span x-show="reservations.filter(reservation => String(reservation.status).toLowerCase() === 'pending').length > 0" x-cloak x-text="reservations.filter(reservation => String(reservation.status).toLowerCase() === 'pending').length"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center shadow"></span>
+            </button>
 
             <button @click="tab = 'productsales'"
                 class="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-sm"
@@ -153,6 +155,24 @@
 
     </main>
 
+    <div x-show="reservationToast" x-cloak role="status" aria-live="polite" class="fixed right-4 top-20 z-[2100] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl">
+        <div class="flex items-start gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <i class="fas fa-bell"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="font-black text-slate-900">New reservation</p>
+                <p class="mt-1 text-sm text-slate-600" x-text="reservationToast"></p>
+                <button @click="openReservations()" class="mt-3 text-xs font-black uppercase tracking-wide text-[#800000]">
+                    View reservations
+                </button>
+            </div>
+            <button @click="reservationToast = ''" aria-label="Dismiss notification" class="text-slate-400 hover:text-slate-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
     <script>
         function managerDashboard() {
             return {
@@ -170,6 +190,9 @@
                 deletingProductId: null,
                 productFormError: '',
                 reservations: [],
+                reservationNotifications: [],
+                reservationToast: '',
+                hasLoadedDatabaseReservations: false,
                voidOrderIndex: null,
                voidCodeInput: '',
                managerCode: '1234',
@@ -545,19 +568,60 @@ async loadTablesFromStorage() {
                 async loadReservationsFromStorage() {
                     try {
                         const response = await fetch('/bookings', {
-                            headers: { 'Accept': 'application/json' }
+                            headers: { 'Accept': 'application/json' },
+                            cache: 'no-store'
                         });
 
-                        if (response.ok) {
-                            this.reservations = await response.json();
-                            return;
+                        if (!response.ok) {
+                            throw new Error('Unable to refresh reservations.');
                         }
+
+                        const reservations = await response.json();
+                        if (this.hasLoadedDatabaseReservations) {
+                            const previousReservationIds = new Set(this.reservations.map(reservation => reservation.id));
+                            const newPendingReservations = reservations.filter(reservation =>
+                                String(reservation.status).toLowerCase() === 'pending'
+                                && !previousReservationIds.has(reservation.id)
+                                && !this.reservationNotifications.some(notification => notification.id === reservation.id)
+                            );
+
+                            newPendingReservations.forEach(reservation => {
+                                this.reservationNotifications.push({
+                                    id: reservation.id,
+                                    name: reservation.name
+                                });
+                            });
+
+                            if (newPendingReservations.length > 0) {
+                                const latestReservation = newPendingReservations[newPendingReservations.length - 1];
+                                this.reservationToast = newPendingReservations.length === 1
+                                    ? `${latestReservation.name} submitted a new reservation.`
+                                    : `${newPendingReservations.length} new reservations have arrived.`;
+                            }
+                        }
+
+                        this.reservations = reservations;
+                        this.hasLoadedDatabaseReservations = true;
+                        return;
                     } catch (error) {
                         console.warn('Unable to load database bookings:', error);
                     }
 
-                    const stored = localStorage.getItem('ub_reservations');
-                    this.reservations = stored ? JSON.parse(stored) : [];
+                    if (!this.hasLoadedDatabaseReservations) {
+                        try {
+                            const stored = localStorage.getItem('ub_reservations');
+                            this.reservations = stored ? JSON.parse(stored) : [];
+                        } catch (error) {
+                            console.warn('Unable to load locally stored reservations:', error);
+                            this.reservations = [];
+                        }
+                    }
+                },
+
+                openReservations() {
+                    this.tab = 'reservations';
+                    this.reservationNotifications = [];
+                    this.reservationToast = '';
                 },
 
 

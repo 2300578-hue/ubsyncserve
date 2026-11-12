@@ -99,6 +99,97 @@ test('orders can still be submitted before the optional booking type migration i
     expect(Schema::hasColumn('orders', 'booking_type'))->toBeFalse();
 });
 
+test('advance order reserves its table only when the order is submitted and guests are known', function () {
+    $product = Product::create([
+        'name' => 'Advance Meal',
+        'selling_price' => 100,
+        'stock_quantity' => 3,
+    ]);
+
+    $response = $this->postJson(route('orders.complete'), [
+        'table_number' => 2,
+        'booking_type' => 'advance-order',
+        'adults' => 2,
+        'children' => 1,
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertCreated();
+
+    $this->assertDatabaseHas('restaurant_tables', [
+        'table_number' => 2,
+        'status' => 'reserved-advance',
+        'adults' => 2,
+        'children' => 1,
+        'guests' => 3,
+    ]);
+
+    $this->postJson(route('orders.complete'), [
+        'table_number' => 2,
+        'booking_type' => 'advance-order',
+        'adults' => 2,
+        'children' => 1,
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('table_number');
+
+    $this->assertDatabaseHas('orders', [
+        'order_number' => $response->json('order_number'),
+        'status' => 'pending',
+    ]);
+    $this->assertDatabaseCount('orders', 1);
+});
+
+test('advance order without guest details does not create an empty advance reservation', function () {
+    $product = Product::create([
+        'name' => 'Advance Meal',
+        'selling_price' => 100,
+        'stock_quantity' => 2,
+    ]);
+
+    $this->postJson(route('orders.complete'), [
+        'table_number' => 3,
+        'booking_type' => 'advance-order',
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertCreated();
+
+    $this->assertDatabaseHas('restaurant_tables', [
+        'table_number' => 3,
+        'status' => 'occupied',
+        'guests' => 0,
+    ]);
+});
+
+test('checkout payment choice stays pending and is preserved when staff confirms payment', function () {
+    $product = Product::create([
+        'name' => 'PayMaya Meal',
+        'selling_price' => 100,
+        'stock_quantity' => 2,
+    ]);
+
+    $response = $this->postJson(route('orders.complete'), [
+        'table_number' => 1,
+        'payment_method' => 'paymaya',
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertCreated();
+
+    $this->assertDatabaseHas('orders', [
+        'order_number' => $response->json('order_number'),
+        'payment_method' => 'paymaya',
+        'status' => 'pending',
+        'paid_at' => null,
+    ]);
+
+    $manager = User::query()->where('role', 'manager')->firstOrFail();
+    $this->actingAs($manager)
+        ->postJson(route('orders.settle-table', 1))
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('orders', [
+        'order_number' => $response->json('order_number'),
+        'payment_method' => 'paymaya',
+        'status' => 'completed',
+    ]);
+});
+
 test('senior and pwd discounts apply immediately without an ID number', function (string $discountType) {
     $product = Product::create([
         'name' => 'Rice Bowl',

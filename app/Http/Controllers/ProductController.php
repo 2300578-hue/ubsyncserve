@@ -59,6 +59,7 @@ class ProductController extends Controller
             'items.*.add_ons.*.name' => ['required', 'string', 'max:255'],
             'table_number' => ['nullable', 'integer', 'between:1,15'],
             'booking_type' => ['nullable', Rule::in(['advance-order'])],
+            'payment_method' => ['sometimes', 'nullable', Rule::in(['gcash', 'paymaya'])],
             'adults' => ['sometimes', 'integer', 'min:0'],
             'children' => ['sometimes', 'integer', 'min:0'],
             'discount_type' => ['nullable', Rule::in(['senior', 'pwd'])],
@@ -164,6 +165,15 @@ class ProductController extends Controller
                     ->lockForUpdate()
                     ->first();
 
+                if (
+                    ($data['booking_type'] ?? null) === 'advance-order'
+                    && ! in_array($tableState->status, ['available', 'reserved-booking'], true)
+                ) {
+                    throw ValidationException::withMessages([
+                        'table_number' => ['This table is no longer available for an advance order. Please select another table.'],
+                    ]);
+                }
+
                 $existingOrders = json_decode($tableState->orders, true, flags: JSON_THROW_ON_ERROR);
                 $allocatedDiscount = 0.00;
                 $lastOrderItemIndex = $orderItems->count() - 1;
@@ -197,14 +207,20 @@ class ProductController extends Controller
                         'discountAmount' => $itemDiscount,
                     ];
                 });
-                $tableStatus = in_array($tableState->status, ['reserved-advance', 'reserved-booking'], true)
-                    ? $tableState->status
-                    : 'occupied';
                 $adults = $data['adults'] ?? (int) $tableState->adults;
                 $children = $data['children'] ?? (int) $tableState->children;
                 if ($adults + $children === 0 && (int) $tableState->guests > 0) {
                     $adults = (int) $tableState->adults;
                     $children = (int) $tableState->children;
+                }
+                $tableStatus = 'occupied';
+                if ($tableState->status === 'reserved-booking') {
+                    $tableStatus = 'reserved-booking';
+                } elseif (
+                    $adults + $children > 0
+                    && (($data['booking_type'] ?? null) === 'advance-order' || $tableState->status === 'reserved-advance')
+                ) {
+                    $tableStatus = 'reserved-advance';
                 }
 
                 DB::table('restaurant_tables')
@@ -229,6 +245,7 @@ class ProductController extends Controller
                 'waiter_id' => Auth::id(),
                 'sales_shift_id' => $salesShift->id,
                 'status' => 'pending',
+                'payment_method' => $data['payment_method'] ?? null,
                 'total_amount' => $grandTotalAmount,
                 'subtotal_amount' => $subtotalAmount,
                 'discount_amount' => $discountAmount,

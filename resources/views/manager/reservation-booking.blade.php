@@ -7,7 +7,7 @@
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 Active Bookings
                 <span x-show="reservations.some(res => res.status === 'pending')" x-cloak class="bg-red-600 text-white px-2 py-0.5 rounded-full text-[9px] tracking-normal">
-                    NEW
+                    <span x-text="reservations.filter(res => res.status === 'pending').length"></span> PENDING
                 </span>
             </p>
         </div>

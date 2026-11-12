@@ -79,8 +79,10 @@ Route::prefix('waiter')->group(function () {
     // Reservation Hub (reservation.blade.php)
     // Ang URL nito ay: 127.0.0.1:8000/waiter/reservation
     Route::get('/reservation', function () {
+        abort_unless(in_array(Auth::user()?->role, ['manager', 'waiter'], true), 403);
+
         return view('waiter.reservation');
-    })->name('waiter.reservation');
+    })->middleware('auth')->name('waiter.reservation');
 
 });
 
@@ -137,19 +139,23 @@ Route::get('/order', function () {
 });
 
 Route::post('/book', [CustomerBookingController::class, 'store'])->name('customer.book.post');
-Route::get('/bookings', [CustomerBookingController::class, 'index'])->name('customer.bookings.index');
-Route::patch('/bookings/{bookingReference}/status', [CustomerBookingController::class, 'updateStatus'])
-    ->name('customer.bookings.status');
-Route::delete('/bookings/{bookingReference}', [CustomerBookingController::class, 'archive'])
-    ->name('customer.bookings.archive');
-Route::delete('/bookings', [CustomerBookingController::class, 'archiveAll'])
-    ->name('customer.bookings.archive-all');
+Route::get('/booking/{bookingReference}/table-details', [CustomerBookingController::class, 'tableDetails'])
+    ->name('customer.booking.table-details');
+Route::middleware('auth')->group(function () {
+    Route::get('/bookings', [CustomerBookingController::class, 'index'])->name('customer.bookings.index');
+    Route::patch('/bookings/{bookingReference}/status', [CustomerBookingController::class, 'updateStatus'])
+        ->name('customer.bookings.status');
+    Route::delete('/bookings/{bookingReference}', [CustomerBookingController::class, 'archive'])
+        ->name('customer.bookings.archive');
+    Route::delete('/bookings', [CustomerBookingController::class, 'archiveAll'])
+        ->name('customer.bookings.archive-all');
+});
 
 Route::get('/book', function () {
     return view('customer.book');
 })->name('customer.book');
 
-Route::post('/reservation/confirm-email', [ReservationEmailController::class, 'confirmEmail'])
+Route::middleware('auth')->post('/reservation/confirm-email', [ReservationEmailController::class, 'confirmEmail'])
     ->name('reservation.confirm.email');
 
 // Redirect root to dashboard
