@@ -65,7 +65,7 @@ class TableStateController extends Controller
             'tables.*.startTime' => ['sometimes', 'nullable', 'date'],
         ]);
 
-        DB::transaction(function () use ($validated): void {
+        DB::transaction(function () use ($request, $validated): void {
             foreach ($validated['tables'] as $table) {
                 DB::table('restaurant_tables')->insertOrIgnore([
                     'table_number' => $table['id'],
@@ -74,6 +74,18 @@ class TableStateController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+                $currentTable = DB::table('restaurant_tables')
+                    ->where('table_number', $table['id'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if (
+                    ($currentTable->status === 'paid' || (bool) $currentTable->is_paid)
+                    && ($table['status'] === 'available' || ($table['isPaid'] ?? true) === false)
+                ) {
+                    abort_unless($request->user()?->role === 'manager', 403);
+                }
 
                 $attributes = [
                     'status' => $table['status'],
@@ -113,8 +125,16 @@ class TableStateController extends Controller
         return response()->json(['success' => true]);
     }
 
-    public function clear(int $tableNumber): JsonResponse
+    public function clear(Request $request, int $tableNumber): JsonResponse
     {
+        $table = DB::table('restaurant_tables')
+            ->where('table_number', $tableNumber)
+            ->first();
+
+        if ($table !== null && ($table->status === 'paid' || (bool) $table->is_paid)) {
+            abort_unless($request->user()?->role === 'manager', 403);
+        }
+
         $updatedRows = DB::table('restaurant_tables')
             ->where('table_number', $tableNumber)
             ->update([

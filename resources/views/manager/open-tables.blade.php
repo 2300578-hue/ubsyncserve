@@ -190,7 +190,7 @@
                             :disabled="isClearingTable"
                             class="py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
                             <i :class="isClearingTable ? 'fas fa-spinner fa-spin' : 'fas fa-check-circle'" class="text-sm"></i>
-                            <span x-text="isClearingTable ? 'CLEARING...' : 'PAID'"></span>
+                            <span x-text="isClearingTable ? 'CLEARING...' : 'PAID - CLEAR TABLE'"></span>
                         </button>
                     </template>
                     <template x-if="selectedTable?.status !== 'paid' && !selectedTable?.isPaid">
@@ -353,7 +353,7 @@
                     <template x-if="selectedTable?.status === 'paid' || selectedTable?.isPaid">
                         <button @click="clearTable(selectedTable?.tableNumber || selectedTable?.id)"
                             class="py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-600\30 active:scale-95 transition-all flex items-center justify-center gap-2">
-                            <i class="fas fa-check-circle text-sm"></i> PAID
+                            <i class="fas fa-check-circle text-sm"></i> PAID - CLEAR TABLE
                         </button>
                     </template>
                     <template x-if="selectedTable?.status !== 'paid' && !selectedTable?.isPaid">

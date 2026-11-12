@@ -31,7 +31,12 @@ class SalesShiftController extends Controller
         $today = $this->businessDate($setting->business_day_cutoff);
         $dates = $this->validatedDates($request, $today);
         $shifts = SalesShift::query()
-            ->whereBetween('business_date', [$dates['from'], $dates['to']])
+            ->where('business_date', '>=', $dates['from'])
+            ->where(
+                'business_date',
+                '<',
+                CarbonImmutable::parse($dates['to'], self::BUSINESS_TIMEZONE)->addDay()->toDateString()
+            )
             ->with('startedBy:id,name')
             ->orderByDesc('business_date')
             ->orderByDesc('started_at')
@@ -122,9 +127,19 @@ class SalesShiftController extends Controller
                 ]);
             }
 
-            if ($shift->orders()->where('status', 'pending')->exists()) {
+            $unpaidTables = $shift->orders()
+                ->where('status', 'pending')
+                ->distinct()
+                ->orderBy('table_number')
+                ->pluck('table_number');
+
+            if ($unpaidTables->isNotEmpty()) {
+                $tableList = $unpaidTables
+                    ->map(fn (?string $tableNumber): string => $tableNumber === null ? 'Walk-in' : "Table {$tableNumber}")
+                    ->implode(', ');
+
                 throw ValidationException::withMessages([
-                    'shift' => ['Settle all unpaid database orders before closing the sales day.'],
+                    'shift' => ["Settle all unpaid database orders before closing the sales day. Pending orders: {$tableList}."],
                 ]);
             }
 
@@ -214,7 +229,16 @@ class SalesShiftController extends Controller
         $paymentMethod = $data['payment_method'] ?? 'cash';
         $this->ensureReportingSchema();
 
-        $paidOrders = DB::transaction(function () use ($request, $tableNumber, $paymentMethod): EloquentCollection {
+        $paidOrders = $this->settlePendingOrdersForTable((string) $tableNumber, $paymentMethod);
+
+        return response()->json([
+            'order_numbers' => $paidOrders->pluck('order_number')->values(),
+        ]);
+    }
+
+    private function settlePendingOrdersForTable(?string $tableNumber, string $paymentMethod): EloquentCollection
+    {
+        return DB::transaction(function () use ($tableNumber, $paymentMethod): EloquentCollection {
             $shift = SalesShift::query()
                 ->where('status', 'open')
                 ->lockForUpdate()
@@ -227,7 +251,7 @@ class SalesShiftController extends Controller
             }
 
             $orders = Order::query()
-                ->where('table_number', (string) $tableNumber)
+                ->where('table_number', $tableNumber)
                 ->where('sales_shift_id', $shift->id)
                 ->where('status', 'pending')
                 ->lockForUpdate()
@@ -235,7 +259,9 @@ class SalesShiftController extends Controller
 
             if ($orders->isEmpty()) {
                 throw ValidationException::withMessages([
-                    'table' => ['No unpaid database order was found for this table.'],
+                    'table' => [$tableNumber === null
+                        ? 'No unpaid walk-in database order was found.'
+                        : 'No unpaid database order was found for this table.'],
                 ]);
             }
 
@@ -249,10 +275,6 @@ class SalesShiftController extends Controller
 
             return $orders;
         });
-
-        return response()->json([
-            'order_numbers' => $paidOrders->pluck('order_number')->values(),
-        ]);
     }
 
     private function ensureReportingSchema(): void
@@ -433,6 +455,7 @@ class SalesShiftController extends Controller
             'timestamp' => $order->paid_at?->toIso8601String(),
             'totalAmount' => (float) $order->total_amount,
             'tableId' => $order->table_number,
+            'bookingType' => $order->booking_type,
             'paymentMethod' => $order->payment_method,
             'items' => $order->items->map(fn (OrderItem $item): array => [
                 'name' => $item->product_name,

@@ -11,6 +11,7 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'table_number',
+        'booking_type',
         'waiter_id',
         'sales_shift_id',
         'status',

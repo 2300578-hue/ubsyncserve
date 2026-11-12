@@ -4,6 +4,7 @@ use App\Models\Product;
 use App\Models\SalesShift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
@@ -21,7 +22,8 @@ test('a manager can start a sales shift and sees empty shift totals', function (
 
     $this->getJson(route('manager.api.sales-shift.show'))
         ->assertSuccessful()
-        ->assertJsonPath('current_shift.status', 'open');
+        ->assertJsonPath('current_shift.status', 'open')
+        ->assertJsonPath('current_shift.opening_float', '1000.00');
 
     $this->getJson(route('manager.api.sales-shift.show'))
         ->assertSuccessful()
@@ -101,11 +103,13 @@ test('closing sales saves exact earnings and starting again resets only the live
     $this->getJson(route('manager.api.sales-shift.show'))
         ->assertSuccessful()
         ->assertJsonPath('current_shift.status', 'open')
-        ->assertJsonPath('summary.order_count', 0)
-        ->assertJsonPath('summary.items_sold', 0)
-        ->assertJsonPath('summary.total_sales', 0)
+        ->assertJsonPath('current_shift.opening_float', '0.00')
+        ->assertJsonPath('summary.order_count', 1)
+        ->assertJsonPath('summary.items_sold', 2)
+        ->assertJsonPath('summary.total_sales', 210)
         ->assertJsonPath('daily_reports.1.summary.expected_cash_drawer', 1210)
-        ->assertJsonCount(0, 'products');
+        ->assertJsonPath('products.0.name', 'Beef Tapa')
+        ->assertJsonCount(1, 'products');
 
     $this->assertDatabaseCount('sales_shifts', 2);
     $this->assertDatabaseHas('sales_shifts', [
@@ -115,6 +119,57 @@ test('closing sales saves exact earnings and starting again resets only the live
         'order_count' => 1,
         'items_sold' => 2,
     ]);
+});
+
+test('paid customer advance orders appear in performance analytics', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+    $this->actingAs($manager);
+    $shift = $this->postJson(route('manager.api.sales-shift.start'), ['opening_float' => 0])
+        ->assertCreated()
+        ->json('shift');
+
+    $product = Product::create([
+        'name' => 'Advance Order Meal',
+        'selling_price' => 100,
+        'stock_quantity' => 3,
+    ]);
+
+    $order = $this->postJson(route('orders.complete'), [
+        'table_number' => 2,
+        'booking_type' => 'advance-order',
+        'items' => [['product_id' => $product->id, 'quantity' => 2]],
+    ])->assertCreated();
+
+    $this->getJson(route('manager.api.sales-shift.show'))
+        ->assertSuccessful()
+        ->assertJsonPath('summary.order_count', 0)
+        ->assertJsonCount(0, 'transactions');
+
+    $this->postJson(route('orders.settle-table', 2))
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('orders', [
+        'order_number' => $order->json('order_number'),
+        'sales_shift_id' => $shift['id'],
+        'status' => 'completed',
+    ]);
+
+    $analytics = $this->getJson(route('manager.api.sales-shift.show'))->assertSuccessful();
+    expect($analytics->json('business_date'))->toBe(substr($shift['business_date'], 0, 10));
+    expect($analytics->json('from'))->toBe(substr($shift['business_date'], 0, 10));
+
+    $analytics
+        ->assertSuccessful()
+        ->assertJsonPath('current_shift.id', $shift['id'])
+        ->assertJsonCount(1, 'daily_reports')
+        ->assertJsonPath('daily_reports.0.summary.order_count', 1)
+        ->assertJsonPath('summary.order_count', 1)
+        ->assertJsonPath('summary.total_sales', 210)
+        ->assertJsonPath('products.0.name', 'Advance Order Meal')
+        ->assertJsonPath('products.0.qtySold', 2)
+        ->assertJsonPath('transactions.0.orderId', $order->json('order_number'))
+        ->assertJsonPath('transactions.0.bookingType', 'advance-order')
+        ->assertJsonPath('transactions.0.status', 'completed');
 });
 
 test('a manager cannot close a shift that still has unpaid table orders', function () {
@@ -135,7 +190,14 @@ test('a manager cannot close a shift that still has unpaid table orders', functi
 
     $this->postJson(route('manager.api.sales-shift.close'))
         ->assertUnprocessable()
-        ->assertJsonValidationErrors('shift');
+        ->assertJsonValidationErrors('shift')
+        ->assertJsonPath('errors.shift.0', 'Settle all unpaid database orders before closing the sales day. Pending orders: Table 3.');
+
+    $this->postJson(route('orders.settle-table', 3))->assertSuccessful();
+
+    $this->postJson(route('manager.api.sales-shift.close'))
+        ->assertSuccessful()
+        ->assertJsonPath('shift.status', 'closed');
 });
 
 test('a table can be settled without selecting a payment method', function () {
@@ -183,7 +245,7 @@ test('a manager can filter sales by business date and update the daily cutoff', 
     $today = now('Asia/Manila')->format('H:i') < '03:00'
         ? now('Asia/Manila')->subDay()->toDateString()
         : now('Asia/Manila')->toDateString();
-    $yesterday = \Illuminate\Support\Carbon::parse($today)->subDay()->toDateString();
+    $yesterday = Carbon::parse($today)->subDay()->toDateString();
 
     SalesShift::query()->create([
         'started_by' => $manager->id,

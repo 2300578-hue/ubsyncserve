@@ -142,7 +142,7 @@
                     <i class="fas fa-check text-4xl"></i>
                 </div>
                 <h2 class="text-2xl font-black uppercase text-gray-900">Order Confirmed!</h2>
-                <p class="mt-2 text-sm text-gray-500">Your order has been submitted. GCash payment is pending staff confirmation; online payment processing is not configured yet.</p>
+                <p class="mt-2 text-sm text-gray-500">Your order has been submitted. It will appear in Performance Analytics after staff confirms your GCash payment. Online payment processing is not configured yet.</p>
                 
                 <div class="mt-6 rounded-[1.5rem] bg-gray-50 p-5 text-left border border-gray-100">
                    <p class="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-4 border-b border-gray-200 pb-3">Receipt Summary</p>
@@ -276,6 +276,7 @@
                             },
                             body: JSON.stringify({
                                 table_number: tableId,
+                                booking_type: this.bookingType === 'advance-order' ? 'advance-order' : null,
                                 adults,
                                 children,
                                 items: this.cart.map(item => ({

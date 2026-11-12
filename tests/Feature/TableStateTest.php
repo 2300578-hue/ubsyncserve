@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -56,6 +57,7 @@ test('table status updates reject invalid statuses and duplicate table numbers',
 });
 
 test('paid table can be cleared with a single table-specific request', function () {
+    $this->actingAs(User::factory()->create(['role' => 'manager']));
     $this->getJson(route('tables.index'))->assertSuccessful();
     $this->putJson(route('tables.update'), [
         'tables' => [
@@ -85,6 +87,47 @@ test('paid table can be cleared with a single table-specific request', function 
         ->assertJsonPath('0.bill', 0)
         ->assertJsonPath('0.orders', [])
         ->assertJsonPath('0.startTime', null);
+});
+
+test('only managers can clear a paid table', function () {
+    $this->getJson(route('tables.index'))->assertSuccessful();
+    $this->putJson(route('tables.update'), [
+        'tables' => [
+            [
+                'id' => 1,
+                'status' => 'paid',
+                'isPaid' => true,
+                'orders' => [['name' => 'Dinner', 'qty' => 1, 'price' => 450]],
+            ],
+        ],
+    ])->assertSuccessful();
+
+    $waiter = User::factory()->create(['role' => 'waiter']);
+
+    $this->actingAs($waiter)
+        ->postJson(route('tables.clear', ['tableNumber' => 1]))
+        ->assertForbidden();
+
+    $this->actingAs($waiter)
+        ->putJson(route('tables.update'), [
+            'tables' => [
+                ['id' => 1, 'status' => 'available', 'isPaid' => false],
+            ],
+        ])
+        ->assertForbidden();
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonPath('0.status', 'paid')
+        ->assertJsonPath('0.isPaid', true);
+});
+
+test('empty tables can still be cleared from customer and waiter flows', function () {
+    $this->getJson(route('tables.index'))->assertSuccessful();
+
+    $this->postJson(route('tables.clear', ['tableNumber' => 1]))
+        ->assertSuccessful()
+        ->assertJsonPath('success', true);
 });
 
 test('all floorplan statuses can be synchronized', function (string $status) {

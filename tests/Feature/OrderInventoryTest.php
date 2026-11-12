@@ -3,6 +3,7 @@
 use App\Models\Product;
 use App\Models\SalesShift;
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -76,6 +77,26 @@ test('waiter orders are saved and decrement product stock', function () {
             'price' => 115,
             'addonName' => 'Cheese',
         ]]);
+});
+
+test('orders can still be submitted before the optional booking type migration is deployed', function () {
+    Schema::table('orders', function (Blueprint $table): void {
+        $table->dropColumn('booking_type');
+    });
+
+    $product = Product::create([
+        'name' => 'Advance Meal',
+        'selling_price' => 100,
+        'stock_quantity' => 2,
+    ]);
+
+    $this->postJson(route('orders.complete'), [
+        'table_number' => 1,
+        'booking_type' => 'advance-order',
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertCreated();
+
+    expect(Schema::hasColumn('orders', 'booking_type'))->toBeFalse();
 });
 
 test('senior and pwd discounts apply immediately without an ID number', function (string $discountType) {

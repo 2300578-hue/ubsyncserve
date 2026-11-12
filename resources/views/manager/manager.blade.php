@@ -353,6 +353,9 @@
                             this.businessDayCutoffLoaded = true;
                         }
                         this.currentShift = result.current_shift;
+                        if (this.currentShift?.status === 'open') {
+                            this.openingFloat = Number(this.currentShift.opening_float || 0).toFixed(2);
+                        }
                         this.salesShiftReport = result;
                         this.orderHistory = result.transactions || [];
                         this.salesSummary.total = Number(result.summary.total_sales || 0);
@@ -1183,9 +1186,17 @@ await this.loadProducts();
                             await this.loadAnalytics();
                         }
 
+                        const table = this.openTables.find(item => Number(item.id) === Number(tableId));
+                        if (table && table.orders && table.orders.length > 0) {
+                            table.status = 'paid';
+                            table.isPaid = true;
+                            await window.tableStateApi.save([table]);
+                            this.selectedTable = { ...this.selectedTable, ...table };
+                            await this.loadTablesFromStorage();
+                        }
+
                         alert('✓ Order ' + this.currentReceiptOrderId + ' printed successfully!');
                         this.showCompleteOrderModal = false;
-                        await this.clearTable(tableId);
                     } catch (error) {
                         alert(error.message || 'Unable to record the table payment.');
                     } finally {

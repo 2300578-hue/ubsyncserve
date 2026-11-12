@@ -359,7 +359,7 @@
                     <i class="fas fa-check-circle text-sm"></i>
                     <span>PAID</span>
                 </button>
-                
+
                 <button x-show="selectedTable?.isPaid !== true" @click="printOrder(selectedTable.id)" class="py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
                     <i class="fas fa-print text-sm"></i> Print
                 </button>
@@ -1181,7 +1181,7 @@ async startSession() {
                 const analyticsHistory = JSON.parse(localStorage.getItem('ub_order_history') || '[]');
 
                 const orderItems = table.orders || [];
-                if (orderItems.length > 0 && table.status !== 'reserved-advance' && table.isPaid !== true) {
+                if (orderItems.length > 0) {
                     const paymentResponse = await fetch(`{{ url('/api/orders/settle-table') }}/${tableId}`, {
                         method: 'POST',
                         headers: {
@@ -1219,7 +1219,7 @@ async startSession() {
                 table.isPaid = true;
                 await window.tableStateApi.save([table]);
                 this.selectedTable = { ...this.selectedTable, ...table };
-                const tableIndex = this.tables.findIndex(item => item.id === table.id);
+                const tableIndex = this.tables.findIndex(item => Number(item.id) === Number(tableId));
                 if (tableIndex !== -1) {
                     this.tables[tableIndex] = this.selectedTable;
                 }
