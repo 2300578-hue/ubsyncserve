@@ -580,7 +580,7 @@
                 </div>
 
                 <div class="border-4 border-black rounded-lg p-4 mb-6 text-center">
-                    <p class="text-2xl font-black tracking-widest text-black" x-text="'TABLE ' + (selectedTable?.id || 'WALK-IN')"></p>
+                    <p class="text-2xl font-black tracking-widest text-black" x-text="(selectedTable?.status === 'reserved-advance' ? 'ADVANCE ORDER · TABLE ' : 'TABLE ') + (selectedTable?.id || 'WALK-IN')"></p>
                 </div>
 
                 <div class="mb-6 pb-4 border-b-2 border-dashed border-black">

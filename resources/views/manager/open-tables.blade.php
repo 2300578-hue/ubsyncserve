@@ -390,7 +390,7 @@
 
                     <!-- Table Number -->
                     <div class="border-4 border-black rounded-lg p-4 mb-6 text-center">
-                        <p class="text-2xl font-black tracking-widest text-black" x-text="'TABLE ' + (selectedTable?.tableNumber || selectedTable?.id || 'WALK-IN')"></p>
+                        <p class="text-2xl font-black tracking-widest text-black" x-text="(selectedTable?.status === 'reserved-advance' ? 'ADVANCE ORDER · TABLE ' : 'TABLE ') + (selectedTable?.tableNumber || selectedTable?.id || 'WALK-IN')"></p>
                     </div>
 
                     <!-- Order Info -->

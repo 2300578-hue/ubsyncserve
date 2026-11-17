@@ -33,7 +33,10 @@ class PrintJobService
 
         $orderIds = $orders->modelKeys();
         $dedupeKey = 'table-receipt:'.$salesShiftId.':'.$tableNumber.':'.hash('sha256', implode(',', $orderIds));
-        $payload = $this->receiptPayload($orders, 'TABLE RECEIPT');
+        $title = $orders->contains(
+            fn (Order $order): bool => $order->booking_type === 'advance-order'
+        ) ? 'ADVANCE ORDER' : 'TABLE RECEIPT';
+        $payload = $this->receiptPayload($orders, $title);
 
         $job = PrintJob::query()->firstOrCreate(
             ['dedupe_key' => $dedupeKey],

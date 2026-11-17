@@ -122,6 +122,7 @@ if (bridge) {
         const gs = '\x1D';
         const orderNumbers = payload.order_numbers ?? [];
         const orderNumber = shortenOrderNumber(orderNumbers[orderNumbers.length - 1] ?? '');
+        const isAdvanceOrder = safeText(payload.title).toUpperCase() === 'ADVANCE ORDER';
         const lines = [
             `${esc}@`,
             `${esc}a${String.fromCharCode(1)}UNIVERSITY OF BATANGAS\n`,
@@ -130,7 +131,7 @@ if (bridge) {
             `${esc}a${String.fromCharCode(0)}`,
             `+${'-'.repeat(40)}+`,
             `${esc}E${String.fromCharCode(1)}${esc}!${String.fromCharCode(16)}`,
-            `${esc}a${String.fromCharCode(1)}TABLE ${safeText(payload.table_number ?? 'WALK-IN')}\n`,
+            `${esc}a${String.fromCharCode(1)}${isAdvanceOrder ? 'ADVANCE ORDER\n' : ''}TABLE ${safeText(payload.table_number ?? 'WALK-IN')}\n`,
             `${esc}!${String.fromCharCode(0)}${esc}E${String.fromCharCode(0)}`,
             `+${'-'.repeat(40)}+`,
             '-'.repeat(42),

@@ -251,6 +251,36 @@ test('table receipts include only pending orders from the currently open sales s
 
     expect($job->payload['order_numbers'])->toBe(['ORD-CURRENT-SHIFT'])
         ->and($job->payload['sales_shift_id'])->toBe($currentShift->id)
+        ->and($job->payload['title'])->toBe('TABLE RECEIPT')
         ->and($job->payload['items'])->toHaveCount(1)
         ->and($job->payload['items'][0]['name'])->toBe('Current Rice Bowl');
+});
+
+test('advance-order table receipts are labeled and include the table number', function (): void {
+    $waiter = User::factory()->create(['role' => 'waiter']);
+    $currentShift = SalesShift::query()->where('status', 'open')->firstOrFail();
+    $order = Order::query()->create([
+        'order_number' => 'ORD-ADVANCE-ORDER',
+        'table_number' => '7',
+        'booking_type' => 'advance-order',
+        'sales_shift_id' => $currentShift->id,
+        'status' => 'pending',
+        'total_amount' => 105,
+        'subtotal_amount' => 100,
+        'discount_amount' => 0,
+        'vat_amount' => 5,
+    ]);
+    $order->items()->create([
+        'product_name' => 'Advance Rice Bowl',
+        'quantity' => 1,
+        'unit_price' => 100,
+    ]);
+
+    $response = $this->actingAs($waiter)
+        ->postJson(route('print-jobs.tables', 7))
+        ->assertCreated();
+    $job = PrintJob::query()->findOrFail($response->json('job_id'));
+
+    expect($job->payload['title'])->toBe('ADVANCE ORDER')
+        ->and($job->payload['table_number'])->toBe('7');
 });
