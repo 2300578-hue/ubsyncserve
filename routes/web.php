@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountRegistrationController;
 use App\Http\Controllers\CustomerBookingController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\PrintBridgeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReservationEmailController;
 use App\Http\Controllers\SalesShiftController;
@@ -46,6 +47,24 @@ Route::post('/api/products', [ProductController::class, 'store'])->name('product
 Route::put('/api/products/{product}', [ProductController::class, 'update'])->name('products.update');
 Route::delete('/api/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
 Route::post('/api/orders/complete', [ProductController::class, 'completeOrder'])->name('orders.complete');
+Route::middleware(['auth', 'throttle:120,1'])->group(function () {
+    Route::get('/print-bridge', [PrintBridgeController::class, 'index'])->name('print-bridge');
+    Route::get('/api/print-jobs/next', [PrintBridgeController::class, 'claimNext'])->name('print-jobs.next');
+    Route::post('/api/print-jobs/tables/{tableNumber}', [PrintBridgeController::class, 'queueTableReceipt'])
+        ->whereNumber('tableNumber')
+        ->name('print-jobs.tables');
+    Route::post('/api/print-jobs/{printJob}/printed', [PrintBridgeController::class, 'markPrinted'])
+        ->whereNumber('printJob')
+        ->name('print-jobs.printed');
+    Route::post('/api/print-jobs/{printJob}/failed', [PrintBridgeController::class, 'markFailed'])
+        ->whereNumber('printJob')
+        ->name('print-jobs.failed');
+    Route::get('/api/print-jobs/{printJob}', [PrintBridgeController::class, 'show'])
+        ->whereNumber('printJob')
+        ->name('print-jobs.show');
+    Route::get('/api/qz/certificate', [PrintBridgeController::class, 'certificate'])->name('qz.certificate');
+    Route::post('/api/qz/sign', [PrintBridgeController::class, 'sign'])->name('qz.sign');
+});
 Route::middleware('auth')->post('/api/orders/settle-table/{tableNumber}', [SalesShiftController::class, 'settleTable'])
     ->whereNumber('tableNumber')
     ->name('orders.settle-table');

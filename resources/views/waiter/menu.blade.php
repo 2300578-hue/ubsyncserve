@@ -353,6 +353,8 @@
             showOrderSummaryModal: false,
             currentOrderId: '',
             isSubmittingOrder: false,
+            orderSubmissionSignature: null,
+            orderSubmissionKey: null,
             discountType: '',
             orderError: '',
 
@@ -414,6 +416,33 @@
 
             formatCurrency(val) {
                 return '₱' + parseFloat(val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            },
+
+            getOrderSubmissionKey() {
+                const signature = JSON.stringify({
+                    table_number: this.tableNumber,
+                    adults: this.adults,
+                    children: this.children,
+                    items: this.cart.map(item => ({
+                        product_id: item.id,
+                        quantity: item.qty,
+                        add_ons: (item.selectedAddOns || []).map(addOn => addOn.name)
+                    })),
+                    discount_type: this.discountType || null
+                });
+
+                if (this.orderSubmissionSignature !== signature) {
+                    const bytes = new Uint8Array(16);
+                    window.crypto.getRandomValues(bytes);
+                    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+                    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+                    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+
+                    this.orderSubmissionSignature = signature;
+                    this.orderSubmissionKey = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+                }
+
+                return this.orderSubmissionKey;
             },
 
             formatDateTime() {
@@ -581,6 +610,7 @@
                 let stockResult;
                 try {
                     const formData = new FormData();
+                    formData.append('idempotency_key', this.getOrderSubmissionKey());
                     if (this.tableNumber) {
                         formData.append('table_number', this.tableNumber);
                     }
@@ -619,6 +649,8 @@
                     return;
                 }
                 this.currentOrderId = stockResult.order_number;
+                this.orderSubmissionSignature = null;
+                this.orderSubmissionKey = null;
 
                 const transaction = {
                     orderId: this.currentOrderId,

@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'qz' => [
+        'certificate_path' => env('QZ_CERT_PATH', env('QZ_CERTIFICATE_PATH', 'storage/app/qz/digital-certificate.txt')),
+        'private_key_path' => env('QZ_PRIVATE_KEY_PATH', 'storage/app/qz/private-key.pem'),
+        'printer_name' => env('QZ_PRINTER_NAME', 'Generic / Text Only'),
+    ],
+
 ];

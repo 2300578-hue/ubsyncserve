@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manager Command Center | UB-SYNC</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @vite('resources/js/print-bridge.js')
     <script src="{{ asset('js/table-state.js') }}"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -43,6 +44,18 @@
 </head>
 
 <body x-data="managerDashboard()" x-init="init()">
+<div
+    id="print-bridge"
+    hidden
+    data-next-url="{{ route('print-jobs.next') }}"
+    data-job-url="{{ url('/api/print-jobs') }}"
+    data-certificate-url="{{ route('qz.certificate') }}"
+    data-signature-url="{{ route('qz.sign') }}"
+    data-printer-name="{{ config('services.qz.printer_name') }}"
+>
+    <span id="print-bridge-status"></span>
+</div>
+
 
     <header class="aws-header">
         <div class="flex items-center gap-4">
@@ -173,6 +186,8 @@
         </div>
     </div>
 
+    <div x-show="printToast" x-cloak role="status" aria-live="polite" class="fixed right-4 top-20 z-[2200] rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white shadow-xl" x-text="printToast"></div>
+
     <script>
         function managerDashboard() {
             return {
@@ -184,6 +199,7 @@
                 showReservedModal: false,
                 showAdvanceOrderModal: false,
                 showCompleteOrderModal: false,
+                printToast: '',
                 showSetupModal: false,
                 editingProductId: null,
                 isSavingProduct: false,
@@ -1215,6 +1231,24 @@ await this.loadProducts();
                         let analyticsHistory = JSON.parse(localStorage.getItem('ub_order_history') || '[]');
 
                         if (this.selectedTable && this.selectedTable.orders && this.selectedTable.orders.length > 0) {
+                            const receiptUrl = '{{ route('print-jobs.tables', ['tableNumber' => '__TABLE__']) }}'
+                                .replace('__TABLE__', encodeURIComponent(tableId));
+                            const receiptResponse = await fetch(receiptUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({})
+                            });
+                            const receiptResult = await receiptResponse.json().catch(() => ({}));
+                            if (!receiptResponse.ok) {
+                                throw new Error(receiptResult.message || 'Unable to queue this receipt.');
+                            }
+
+                            await this.waitForPrintJob(receiptResult.job_id);
+
                             const response = await fetch(`{{ url('/api/orders/settle-table') }}/${tableId}`, {
                                 method: 'POST',
                                 headers: {
@@ -1247,25 +1281,71 @@ await this.loadProducts();
 
                                 localStorage.setItem('ub_order_history', JSON.stringify(analyticsHistory));
                             }
-                            await this.loadAnalytics();
+                            void this.loadAnalytics();
                         }
 
                         const table = this.openTables.find(item => Number(item.id) === Number(tableId));
                         if (table && table.orders && table.orders.length > 0) {
                             table.status = 'paid';
                             table.isPaid = true;
-                            await window.tableStateApi.save([table]);
                             this.selectedTable = { ...this.selectedTable, ...table };
-                            await this.loadTablesFromStorage();
+                            void window.tableStateApi.save([table])
+                                .then(() => this.loadTablesFromStorage())
+                                .catch(error => {
+                                    this.tableSyncError = `Payment was recorded, but table status could not be synchronized: ${error.message}`;
+                                    console.error('Unable to synchronize the paid table:', error);
+                                });
                         }
 
-                        alert('✓ Order ' + this.currentReceiptOrderId + ' printed successfully!');
                         this.showCompleteOrderModal = false;
+                        this.notifyPrint('Order ' + this.currentReceiptOrderId + ' printed successfully.');
                     } catch (error) {
                         alert(error.message || 'Unable to record the table payment.');
                     } finally {
                         this.isConfirmingPrint = false;
                     }
+                },
+
+                notifyPrint(message) {
+                    this.printToast = message;
+                    window.setTimeout(() => {
+                        if (this.printToast === message) {
+                            this.printToast = '';
+                        }
+                    }, 2500);
+                },
+
+                async waitForPrintJob(jobId) {
+                    const statusUrl = '{{ route('print-jobs.show', ['printJob' => '__JOB__']) }}'
+                        .replace('__JOB__', encodeURIComponent(jobId));
+                    const deadline = Date.now() + 30000;
+
+                    while (Date.now() < deadline) {
+                        const response = await fetch(statusUrl, {
+                            cache: 'no-store',
+                            headers: { 'Accept': 'application/json' }
+                        });
+                        const result = await response.json().catch(() => ({}));
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to check the print status.');
+                        }
+                        if (result.status === 'printed') {
+                            return;
+                        }
+                        if (result.status === 'failed') {
+                            throw new Error(result.error_message || 'The Windows print bridge failed to print this receipt.');
+                        }
+
+                        const bridgeStatus = document.querySelector('#print-bridge-status')?.textContent.trim() || '';
+                        if (/^Print bridge (could not start|error):/i.test(bridgeStatus)) {
+                            throw new Error(bridgeStatus);
+                        }
+
+                        await new Promise(resolve => window.setTimeout(resolve, 200));
+                    }
+
+                    throw new Error('Print is still waiting. Check that QZ Tray and the printer are ready, then try again.');
                 }
             }
         }

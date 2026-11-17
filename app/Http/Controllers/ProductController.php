@@ -52,6 +52,7 @@ class ProductController extends Controller
     public function completeOrder(Request $request): JsonResponse
     {
         $data = $request->validate([
+            'idempotency_key' => ['nullable', 'uuid'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
@@ -72,13 +73,28 @@ class ProductController extends Controller
             abort(503, 'Sales reporting database is not set up. Run php artisan migrate, then reload this page.');
         }
 
+        $idempotencyKey = $data['idempotency_key'] ?? null;
+        if ($idempotencyKey !== null) {
+            $existingOrder = Order::query()->where('idempotency_key', $idempotencyKey)->first();
+            if ($existingOrder !== null) {
+                return response()->json($this->orderResponse($existingOrder), 200);
+            }
+        }
+
         $hasBookingTypeColumn = Schema::hasColumn('orders', 'booking_type');
 
-        $result = DB::transaction(function () use ($data, $hasBookingTypeColumn): array {
+        $result = DB::transaction(function () use ($data, $hasBookingTypeColumn, $idempotencyKey): array {
             $salesShift = SalesShift::query()
                 ->where('status', 'open')
                 ->lockForUpdate()
                 ->first();
+
+            if ($idempotencyKey !== null) {
+                $existingOrder = Order::query()->where('idempotency_key', $idempotencyKey)->first();
+                if ($existingOrder !== null) {
+                    return ['order' => $existingOrder, 'duplicate' => true];
+                }
+            }
 
             $settings = SalesSetting::current();
             $businessDate = CarbonImmutable::now('Asia/Manila');
@@ -240,6 +256,7 @@ class ProductController extends Controller
 
             $order = Order::create([
                 'order_number' => 'ORD-'.Str::upper((string) Str::uuid()),
+                'idempotency_key' => $idempotencyKey,
                 'table_number' => $tableNumber,
                 ...($hasBookingTypeColumn ? ['booking_type' => $data['booking_type'] ?? null] : []),
                 'waiter_id' => Auth::id(),
@@ -259,23 +276,32 @@ class ProductController extends Controller
 
             return [
                 'order' => $order,
-                'subtotal_amount' => $subtotalAmount,
-                'discount_amount' => $discountAmount,
-                'vat_amount' => $vatAmount,
-                'grand_total_amount' => $grandTotalAmount,
+                'duplicate' => false,
             ];
         });
 
-        return response()->json([
+        return response()->json(
+            $this->orderResponse($result['order']),
+            $result['duplicate'] ? 200 : 201
+        );
+    }
+
+    /**
+     * @return array<string, int|float|string|bool>
+     */
+    private function orderResponse(Order $order): array
+    {
+        return [
             'message' => 'Order saved and inventory updated.',
-            'order_id' => $result['order']->id,
-            'order_number' => $result['order']->order_number,
-            'total_amount' => (float) $result['order']->total_amount,
-            'subtotal_amount' => $result['subtotal_amount'],
-            'discount_amount' => $result['discount_amount'],
-            'vat_amount' => $result['vat_amount'],
-            'grand_total_amount' => $result['grand_total_amount'],
-        ], 201);
+            'order_id' => $order->id,
+            'order_number' => $order->order_number,
+            'print_job_queued' => false,
+            'total_amount' => (float) $order->total_amount,
+            'subtotal_amount' => (float) $order->subtotal_amount,
+            'discount_amount' => (float) $order->discount_amount,
+            'vat_amount' => (float) $order->vat_amount,
+            'grand_total_amount' => (float) $order->total_amount,
+        ];
     }
 
     /**

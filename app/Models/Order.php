@@ -10,6 +10,7 @@ class Order extends Model
 {
     protected $fillable = [
         'order_number',
+        'idempotency_key',
         'table_number',
         'booking_type',
         'waiter_id',

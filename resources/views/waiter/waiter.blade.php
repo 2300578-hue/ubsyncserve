@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waiter Command Center | UB-SYNC</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @vite('resources/js/print-bridge.js')
     <script src="{{ asset('js/table-state.js') }}"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -34,6 +35,17 @@
 </head>
 
 <body x-data="waiterSystem()" x-init="init()">
+<div
+    id="print-bridge"
+    hidden
+    data-next-url="{{ route('print-jobs.next') }}"
+    data-job-url="{{ url('/api/print-jobs') }}"
+    data-certificate-url="{{ route('qz.certificate') }}"
+    data-signature-url="{{ route('qz.sign') }}"
+    data-printer-name="{{ config('services.qz.printer_name') }}"
+>
+    <span id="print-bridge-status"></span>
+</div>
 
     <header class="aws-header">
         <div class="flex items-center gap-4">
@@ -559,7 +571,7 @@
 </div>
 
     <template x-teleport="body">
-    <div x-show="showCompleteOrderModal" x-cloak class="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 pointer-events-auto" @click.self="showCompleteOrderModal = false">
+    <div x-show="showCompleteOrderModal" x-cloak class="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-900/60 p-4 pointer-events-auto" @click.self="showCompleteOrderModal = false">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div class="p-8 font-mono text-sm leading-relaxed border-b-2 border-black max-h-[70vh] overflow-y-auto">
                 <div class="text-center mb-6 pb-4 border-b-2 border-dashed border-black">
@@ -625,9 +637,9 @@
             </div>
 
             <div class="bg-slate-50 p-4 border-t border-slate-200">
-                <button type="button" @click.stop="confirmPrint(selectedTable?.id)" :disabled="isConfirmingPrint || !selectedTable" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                <button type="button" @click.stop="confirmPrint(selectedTable?.id)" :disabled="isConfirmingPrint || !selectedTable" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-none flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
                     <i class="fa-solid fa-check"></i>
-                    <span x-text="isConfirmingPrint ? 'Processing…' : 'Confirm Print'"></span>
+                    <span x-text="isConfirmingPrint ? 'Printing…' : 'Confirm Print'"></span>
                 </button>
             </div>
             </template>
@@ -1222,6 +1234,24 @@ async startSession() {
 
                 const orderItems = table.orders || [];
                 if (orderItems.length > 0) {
+                    const receiptUrl = '{{ route('print-jobs.tables', ['tableNumber' => '__TABLE__']) }}'
+                        .replace('__TABLE__', encodeURIComponent(tableId));
+                    const receiptResponse = await fetch(receiptUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                    const receiptResult = await receiptResponse.json().catch(() => ({}));
+                    if (!receiptResponse.ok) {
+                        throw new Error(receiptResult.message || 'Unable to queue this receipt.');
+                    }
+
+                    await this.waitForPrintJob(receiptResult.job_id);
+
                     const paymentResponse = await fetch(`{{ url('/api/orders/settle-table') }}/${tableId}`, {
                         method: 'POST',
                         headers: {
@@ -1257,20 +1287,58 @@ async startSession() {
 
                 table.status = 'paid';
                 table.isPaid = true;
-                await window.tableStateApi.save([table]);
                 this.selectedTable = { ...this.selectedTable, ...table };
                 const tableIndex = this.tables.findIndex(item => Number(item.id) === Number(tableId));
                 if (tableIndex !== -1) {
                     this.tables[tableIndex] = this.selectedTable;
                 }
+                void window.tableStateApi.save([table]).catch(error => {
+                    this.tableSyncError = `Payment was recorded, but table status could not be synchronized: ${error.message}`;
+                    console.error('Unable to synchronize the paid table:', error);
+                });
 
                 this.showCompleteOrderModal = false;
-                this.toastNotification('✓ Order ' + this.currentReceiptOrderId + ' printed successfully!');
+                this.toastNotification('Receipt printed successfully.');
             } catch (error) {
                 alert(error.message || 'Unable to confirm print and update the table payment status.');
             } finally {
                 this.isConfirmingPrint = false;
             }
+        },
+
+        async waitForPrintJob(jobId) {
+            const statusUrl = '{{ route('print-jobs.show', ['printJob' => '__JOB__']) }}'
+                .replace('__JOB__', encodeURIComponent(jobId));
+            const deadline = Date.now() + 30000;
+
+            while (Date.now() < deadline) {
+                const response = await fetch(statusUrl, {
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                const result = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(result.message || 'Unable to check the print status.');
+                }
+
+                if (result.status === 'printed') {
+                    return;
+                }
+
+                if (result.status === 'failed') {
+                    throw new Error(result.error_message || 'The Windows print bridge failed to print this receipt.');
+                }
+
+                const bridgeStatus = document.querySelector('#print-bridge-status')?.textContent.trim() || '';
+                if (/^Print bridge (could not start|error):/i.test(bridgeStatus)) {
+                    throw new Error(bridgeStatus);
+                }
+
+                await new Promise(resolve => window.setTimeout(resolve, 200));
+            }
+
+            throw new Error('Print is still waiting. Check that the Windows print bridge and QZ Tray are running, then try again.');
         },
 
         toastNotification(message) {

@@ -379,7 +379,7 @@
 
     <!-- Receipt Modal -->
     <template x-teleport="body">
-        <div x-show="showCompleteOrderModal" x-cloak class="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div x-show="showCompleteOrderModal" x-cloak class="fixed inset-0 z-[1400] flex items-center justify-center bg-slate-900/60 p-4">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
                 <div class="p-8 font-mono text-sm leading-relaxed border-b-2 border-black max-h-[70vh] overflow-y-auto">
                     <!-- Restaurant Info -->
@@ -452,9 +452,9 @@
 
                 <!-- Action Button -->
                 <div class="bg-slate-50 p-4 border-t border-slate-200">
-                    <button @click="confirmPrint(selectedTable?.tableNumber || selectedTable?.id)" :disabled="isConfirmingPrint" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                    <button @click="confirmPrint(selectedTable?.tableNumber || selectedTable?.id)" :disabled="isConfirmingPrint" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-none flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
                         <i class="fa-solid fa-check"></i>
-                        <span x-text="isConfirmingPrint ? 'Recording payment…' : 'Confirm Print'"></span>
+                        <span x-text="isConfirmingPrint ? 'Printing…' : 'Confirm Print'"></span>
                     </button>
                 </div>
             </div>

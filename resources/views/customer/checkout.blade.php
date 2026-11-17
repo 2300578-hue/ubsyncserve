@@ -125,17 +125,6 @@
                                     <i class="fas fa-check-circle text-xl"></i>
                                 </div>
                             </label>
-                            <label :class="paymentMethod === 'paymaya' ? 'border-[#800000] bg-[#fff4f4]' : 'border-gray-200 bg-white'" class="flex cursor-pointer items-center gap-4 rounded-[1.5rem] border-2 p-4">
-                                <input type="radio" name="payment_method" value="paymaya" x-model="paymentMethod" class="sr-only">
-                                <span class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm"><i class="fas fa-wallet"></i></span>
-                                <div>
-                                    <p class="font-black uppercase text-gray-900">PayMaya</p>
-                                    <p class="text-xs text-gray-500">PayMaya payment will be confirmed by staff.</p>
-                                </div>
-                                <div x-show="paymentMethod === 'paymaya'" class="ml-auto text-[#800000]">
-                                    <i class="fas fa-check-circle text-xl"></i>
-                                </div>
-                            </label>
                         </div>
                         <p class="mt-3 text-xs text-gray-500">Online payment processing is not configured yet. Do not send payment until staff provides instructions.</p>
                     </div>
@@ -182,7 +171,7 @@
                 guestCount: 0,
                 paymentMethod: 'gcash',
                 get paymentMethodLabel() {
-                    return this.paymentMethod === 'paymaya' ? 'PayMaya' : 'GCash';
+                    return 'GCash';
                 },
                 bookingType: 'dine-in',
                 orderComplete: false,
@@ -204,10 +193,6 @@
                     }
                     this.tableNumber = savedTable || null;
                     this.bookingType = savedBookingType;
-                    const savedPaymentMethod = localStorage.getItem('customer_payment_method');
-                    if (['gcash', 'paymaya'].includes(savedPaymentMethod)) {
-                        this.paymentMethod = savedPaymentMethod;
-                    }
 
                     const savedAdults = parseInt(localStorage.getItem('customer_guests_adults'), 10);
                     const savedChildren = parseInt(localStorage.getItem('customer_guests_children'), 10);
@@ -219,9 +204,6 @@
                         const submittedOrder = JSON.parse(localStorage.getItem('customer_last_submitted_order') || 'null');
                         if (submittedOrder?.status === 'submitted' && submittedOrder.tableId) {
                             this.tableNumber = String(submittedOrder.tableId);
-                            if (['gcash', 'paymaya'].includes(submittedOrder.paymentMethod)) {
-                                this.paymentMethod = submittedOrder.paymentMethod;
-                            }
                             this.serverSubtotal = Number.isFinite(Number(submittedOrder.subtotal))
                                 ? Number(submittedOrder.subtotal)
                                 : null;
