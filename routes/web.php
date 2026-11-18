@@ -53,6 +53,9 @@ Route::middleware(['auth', 'throttle:120,1'])->group(function () {
     Route::post('/api/print-jobs/tables/{tableNumber}', [PrintBridgeController::class, 'queueTableReceipt'])
         ->whereNumber('tableNumber')
         ->name('print-jobs.tables');
+    Route::post('/api/print-jobs/tables/{tableNumber}/advance-order-slips', [PrintBridgeController::class, 'queueTableAdvanceOrderSlips'])
+        ->whereNumber('tableNumber')
+        ->name('print-jobs.advance-order-slips');
     Route::post('/api/print-jobs/{printJob}/printed', [PrintBridgeController::class, 'markPrinted'])
         ->whereNumber('printJob')
         ->name('print-jobs.printed');

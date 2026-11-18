@@ -35,6 +35,29 @@ class PrintBridgeController extends Controller
         ], $job->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function queueTableAdvanceOrderSlips(
+        Request $request,
+        int $tableNumber,
+        PrintJobService $printJobs
+    ): JsonResponse {
+        $this->authorizeStaff($request);
+
+        $jobs = $printJobs->queueTableAdvanceOrderSlips($tableNumber);
+
+        abort_if($jobs === [], 422, 'This table has no pending advance orders to print.');
+
+        $created = collect($jobs)->contains(
+            fn (PrintJob $job): bool => $job->wasRecentlyCreated
+        );
+
+        return response()->json([
+            'job_ids' => array_map(
+                fn (PrintJob $job): int => $job->id,
+                $jobs
+            ),
+        ], $created ? 201 : 200);
+    }
+
     public function claimNext(Request $request): Response
     {
         $this->authorizeStaff($request);

@@ -561,9 +561,10 @@
                     Close
                 </button>
 
-                <button x-show="selectedTable?.isPaid !== true && advanceOrderSentToKitchen" @click="printOrder(selectedTable.id)"
+                <button x-show="selectedTable?.isPaid !== true && advanceOrderSentToKitchen" @click="printAdvanceOrder(selectedTable.id)" :disabled="isPrintingAdvanceOrderSlip"
                     class="col-span-2 py-4 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
-                    <i class="fas fa-print text-sm"></i> Print
+                    <i class="fas fa-print text-sm"></i>
+                    <span x-text="isPrintingAdvanceOrderSlip ? 'Printing Order Slip…' : 'Print'"></span>
                 </button>
             </div>
         </div>
@@ -637,9 +638,17 @@
             </div>
 
             <div class="bg-slate-50 p-4 border-t border-slate-200">
-                <button type="button" @click.stop="confirmPrint(selectedTable?.id)" :disabled="isConfirmingPrint || !selectedTable" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-none flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                <button x-show="!isAdvanceOrderPrintFlow" type="button" @click.stop="confirmPrint(selectedTable?.id)" :disabled="isConfirmingPrint || !selectedTable" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-none flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
                     <i class="fa-solid fa-check"></i>
                     <span x-text="isConfirmingPrint ? 'Printing…' : 'Confirm Print'"></span>
+                </button>
+                <button x-show="isAdvanceOrderPrintFlow && !advanceOrderSlipPrinted" type="button" @click.stop="printAdvanceOrderSlip(selectedTable?.id)" :disabled="isPrintingAdvanceOrderSlip || !selectedTable" class="w-full py-3 bg-emerald-600 text-white font-semibold rounded-lg text-sm shadow-md transition-none flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                    <i class="fa-solid fa-print"></i>
+                    <span x-text="isPrintingAdvanceOrderSlip ? 'Printing order slip…' : 'Print Order Slip'"></span>
+                </button>
+                <button x-show="isAdvanceOrderPrintFlow && advanceOrderSlipPrinted" type="button" @click.stop="confirmPrint(selectedTable?.id)" :disabled="isConfirmingPrint || !selectedTable" class="w-full py-3 maroon-gradient text-white font-semibold rounded-lg text-sm shadow-md transition-none flex items-center justify-center gap-2 disabled:cursor-wait disabled:opacity-60">
+                    <i class="fa-solid fa-check"></i>
+                    <span x-text="isConfirmingPrint ? 'Printing bill…' : 'Confirm Print Bill'"></span>
                 </button>
             </div>
             </template>
@@ -674,8 +683,8 @@
             <!-- Action Buttons -->
             <div class="bg-slate-50 p-4 flex gap-3 border-t border-slate-200">
                 <button @click="showAdvanceKitchenTicketModal = false; showAdvanceOrderModal = true" class="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-semibold rounded-lg text-xs transition-all">Cancel</button>
-                <button @click="finalizeAdvanceOrder(selectedTable?.id)" class="flex-1 py-2 maroon-gradient text-white font-semibold rounded-lg text-xs shadow-md transition-all">
-                    Send to Kitchen
+                <button @click="finalizeAdvanceOrder(selectedTable?.id)" :disabled="isSendingAdvanceOrder" class="flex-1 py-2 maroon-gradient text-white font-semibold rounded-lg text-xs shadow-md transition-all disabled:cursor-wait disabled:opacity-60">
+                    <span x-text="isSendingAdvanceOrder ? 'Sending…' : 'Send to Kitchen'"></span>
                 </button>
             </div>
         </div>
@@ -728,8 +737,8 @@
 
             <div class="bg-slate-50 p-4 flex gap-3 border-t border-slate-200">
                 <button @click="showAdvanceOrderSummaryModal = false; showAdvanceOrderModal = true" class="flex-1 py-2 bg-white border border-slate-200 text-slate-600 font-semibold rounded-lg text-xs transition-all">Cancel</button>
-                <button @click="finalizeAdvanceOrder(selectedTable?.id)" class="flex-1 py-2 maroon-gradient text-white font-semibold rounded-lg text-xs shadow-md transition-all">
-                    Send Order
+                <button @click="finalizeAdvanceOrder(selectedTable?.id)" :disabled="isSendingAdvanceOrder" class="flex-1 py-2 maroon-gradient text-white font-semibold rounded-lg text-xs shadow-md transition-all disabled:cursor-wait disabled:opacity-60">
+                    <span x-text="isSendingAdvanceOrder ? 'Sending…' : 'Send Order'"></span>
                 </button>
             </div>
         </div>
@@ -751,6 +760,10 @@ function waiterSystem() {
         advanceOrderSentToKitchen: false,
         currentReceiptOrderId: '',
         isConfirmingPrint: false,
+        isSendingAdvanceOrder: false,
+        isAdvanceOrderPrintFlow: false,
+        isPrintingAdvanceOrderSlip: false,
+        advanceOrderSlipPrinted: false,
         // Data Arrays
         tables: [],
         tableSyncError: '',
@@ -863,6 +876,8 @@ function waiterSystem() {
         selectTable(table) {
             this.selectedTable = table;
             this.advanceOrderSentToKitchen = false;
+            this.isAdvanceOrderPrintFlow = false;
+            this.advanceOrderSlipPrinted = false;
             if (table.status === 'reserved-advance') {
                 this.showAdvanceOrderModal = true;
             } else if (table.status === 'occupied' || table.status === 'paid' || table.isPaid || (table.orders && table.orders.length > 0)) {
@@ -1184,13 +1199,30 @@ async startSession() {
 
         async printOrder(tableId) {
             this.currentReceiptOrderId = 'ORD-' + Date.now();
+            this.isAdvanceOrderPrintFlow = false;
+            this.advanceOrderSlipPrinted = false;
             this.showOrderModal = false;
             this.showAdvanceOrderModal = false;
             this.showCompleteOrderModal = true;
         },
 
-        finalizeAdvanceOrder(tableId) {
-            if (this.selectedTable?.isPaid !== true && !this.advanceOrderSentToKitchen) {
+        async printAdvanceOrder(tableId) {
+            this.isAdvanceOrderPrintFlow = true;
+            this.showAdvanceOrderModal = false;
+            this.showCompleteOrderModal = true;
+        },
+
+        async finalizeAdvanceOrder(tableId) {
+            if (
+                this.isSendingAdvanceOrder
+                || this.selectedTable?.isPaid === true
+                || this.advanceOrderSentToKitchen
+            ) {
+                return;
+            }
+
+            this.isSendingAdvanceOrder = true;
+            try {
                 let kitchenOrders = JSON.parse(localStorage.getItem('ub_kitchen_orders') || '[]');
                 const orderId = 'ORD-' + Date.now();
 
@@ -1211,12 +1243,64 @@ async startSession() {
                 kitchenOrders.push(transaction);
                 localStorage.setItem('ub_kitchen_orders', JSON.stringify(kitchenOrders));
                 this.currentReceiptOrderId = orderId;
+
+                this.advanceOrderSentToKitchen = true;
+                this.showAdvanceOrderSummaryModal = false;
+                this.showAdvanceOrderModal = true;
+                this.isAdvanceOrderPrintFlow = true;
+                this.advanceOrderSlipPrinted = false;
+                this.toastNotification('Order successfully sent to stations!');
+
+                await this.printAdvanceOrderSlip(tableId);
+            } finally {
+                this.isSendingAdvanceOrder = false;
+            }
+        },
+
+        async printAdvanceOrderSlip(tableId) {
+            if (
+                this.isPrintingAdvanceOrderSlip
+                || !this.isAdvanceOrderPrintFlow
+                || tableId === null
+                || tableId === undefined
+            ) {
+                return;
             }
 
-            this.advanceOrderSentToKitchen = true;
-            this.showAdvanceOrderSummaryModal = false;
-            this.showAdvanceOrderModal = true;
-            this.toastNotification('Order successfully sent to stations!');
+            this.isPrintingAdvanceOrderSlip = true;
+            try {
+                const slipsUrl = '{{ route('print-jobs.advance-order-slips', ['tableNumber' => '__TABLE__']) }}'
+                    .replace('__TABLE__', encodeURIComponent(tableId));
+                const slipsResponse = await fetch(slipsUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const slipsResult = await slipsResponse.json().catch(() => ({}));
+                if (!slipsResponse.ok) {
+                    throw new Error(slipsResult.message || 'Unable to queue the advance-order slip.');
+                }
+
+                const jobIds = slipsResult.job_ids || [];
+                if (jobIds.length === 0) {
+                    throw new Error('This table has no pending advance orders to print.');
+                }
+
+                for (const jobId of jobIds) {
+                    await this.waitForPrintJob(jobId);
+                }
+
+                this.advanceOrderSlipPrinted = true;
+                this.toastNotification('Advance-order slip printed. Confirm print to print the bill.');
+            } catch (error) {
+                alert(error.message || 'Unable to print the advance-order slip.');
+            } finally {
+                this.isPrintingAdvanceOrderSlip = false;
+            }
         },
 
         async confirmPrint(tableId) {

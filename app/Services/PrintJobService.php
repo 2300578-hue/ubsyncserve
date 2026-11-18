@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\PrintJob;
 use App\Models\SalesShift;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 class PrintJobService
 {
@@ -18,7 +19,9 @@ class PrintJobService
         $order->loadMissing('items');
         $receiptTime = now('Asia/Manila');
         $payload = [
-            'title' => 'ORDER SLIP',
+            'title' => $order->booking_type === 'advance-order'
+                ? 'ADVANCE ORDER SLIP'
+                : 'ORDER SLIP',
             'sales_shift_id' => $order->sales_shift_id,
             'table_number' => $order->table_number,
             'order_number' => $order->order_number,
@@ -52,6 +55,37 @@ class PrintJobService
         }
 
         return $job;
+    }
+
+    /**
+     * @return array<PrintJob>
+     */
+    public function queueTableAdvanceOrderSlips(int $tableNumber): array
+    {
+        if (! Schema::hasColumn((new Order)->getTable(), 'booking_type')) {
+            return [];
+        }
+
+        $salesShiftId = SalesShift::query()
+            ->where('status', 'open')
+            ->value('id');
+
+        if ($salesShiftId === null) {
+            return [];
+        }
+
+        return Order::query()
+            ->where('table_number', (string) $tableNumber)
+            ->where('sales_shift_id', $salesShiftId)
+            ->where('status', 'pending')
+            ->where('booking_type', 'advance-order')
+            ->with('items')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Order $order): ?PrintJob => $this->queueOrderSlip($order))
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function queueTableReceipt(int $tableNumber): ?PrintJob

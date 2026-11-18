@@ -133,6 +133,61 @@ test('one bridge claims and acknowledges each job only once', function (): void 
     ]);
 });
 
+test('advance-order slip requests print only pending advance orders for the table', function (): void {
+    $waiter = User::factory()->create(['role' => 'waiter']);
+    $currentShift = SalesShift::query()->where('status', 'open')->firstOrFail();
+
+    $advanceOrder = Order::query()->create([
+        'order_number' => 'ORD-ADVANCE-SLIP',
+        'table_number' => '8',
+        'booking_type' => 'advance-order',
+        'sales_shift_id' => $currentShift->id,
+        'status' => 'pending',
+        'total_amount' => 105,
+        'subtotal_amount' => 100,
+        'discount_amount' => 0,
+        'vat_amount' => 5,
+    ]);
+    $advanceOrder->items()->create([
+        'product_name' => 'Advance Rice Bowl',
+        'quantity' => 1,
+        'unit_price' => 100,
+    ]);
+
+    $regularOrder = Order::query()->create([
+        'order_number' => 'ORD-REGULAR-SLIP',
+        'table_number' => '8',
+        'sales_shift_id' => $currentShift->id,
+        'status' => 'pending',
+        'total_amount' => 50,
+        'subtotal_amount' => 50,
+        'discount_amount' => 0,
+        'vat_amount' => 0,
+    ]);
+    $regularOrder->items()->create([
+        'product_name' => 'Regular Coffee',
+        'quantity' => 1,
+        'unit_price' => 50,
+    ]);
+
+    $first = $this->actingAs($waiter)
+        ->postJson(route('print-jobs.advance-order-slips', 8))
+        ->assertCreated()
+        ->assertJsonCount(1, 'job_ids');
+
+    $this->postJson(route('print-jobs.advance-order-slips', 8))
+        ->assertSuccessful()
+        ->assertJsonPath('job_ids', $first->json('job_ids'));
+
+    $job = PrintJob::query()->where('job_type', 'order_slip')->firstOrFail();
+
+    expect($job->payload['title'])->toBe('ADVANCE ORDER SLIP')
+        ->and($job->payload['order_number'])->toBe('ORD-ADVANCE-SLIP')
+        ->and($job->payload['items'][0]['name'])->toBe('Advance Rice Bowl');
+
+    $this->assertDatabaseCount('print_jobs', 1);
+});
+
 test('the bridge skips pending individual order receipts from the old workflow', function (): void {
     $waiter = User::factory()->create(['role' => 'waiter']);
     $job = PrintJob::query()->create([

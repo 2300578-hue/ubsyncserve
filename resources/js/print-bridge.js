@@ -197,13 +197,15 @@ if (bridge) {
         const esc = '\x1B';
         const gs = '\x1D';
         const orderNumber = shortenOrderNumber(payload.order_number ?? '');
+        const isAdvanceOrder = safeText(payload.title).toUpperCase().includes('ADVANCE ORDER');
+        const tableLabel = `TABLE ${safeText(payload.table_number ?? 'WALK-IN')}${isAdvanceOrder ? ' ADVANCE ORDER' : ''}`;
         const lines = [
             `${esc}@`,
             `${esc}a${String.fromCharCode(1)}UNIVERSITY OF BATANGAS\n`,
             'Hilltop Rd. Batangas City, 4250 Batangas\n',
             '-'.repeat(42),
-            `${esc}a${String.fromCharCode(1)}ORDER SLIP\n`,
-            `${esc}a${String.fromCharCode(0)}TABLE ${safeText(payload.table_number ?? 'WALK-IN')}\n`,
+            `${esc}a${String.fromCharCode(1)}${safeText(payload.title || 'ORDER SLIP').toUpperCase()}\n`,
+            `${esc}a${String.fromCharCode(0)}${tableLabel}\n`,
             '-'.repeat(42),
             fitColumns('ORDER ID:', safeText(orderNumber), 42),
             fitColumns('DATE:', safeText(payload.date), 42),
@@ -287,7 +289,7 @@ if (bridge) {
 
                 if (response.status === 204) {
                     setStatus(`Connected to QZ Tray. Waiting for jobs for ${printerName}…`);
-                    await delay(150);
+                    await delay(100);
                     continue;
                 }
 
