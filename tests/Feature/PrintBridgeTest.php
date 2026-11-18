@@ -20,7 +20,7 @@ beforeEach(function (): void {
     ]);
 });
 
-test('staff table order submission waits for confirm print before queuing a receipt', function (): void {
+test('staff table order submission queues an order slip', function (): void {
     $waiter = User::factory()->create(['role' => 'waiter']);
     $product = Product::create([
         'name' => 'Rice Bowl',
@@ -32,8 +32,34 @@ test('staff table order submission waits for confirm print before queuing a rece
         'table_number' => 4,
         'items' => [['product_id' => $product->id, 'quantity' => 1]],
     ])->assertCreated()
-        ->assertJsonPath('print_job_queued', false);
+        ->assertJsonPath('print_job_queued', true)
+        ->assertJsonStructure(['order_id', 'order_number', 'print_job_id']);
 
+    $job = PrintJob::query()->where('job_type', 'order_slip')->firstOrFail();
+
+    expect($job->payload['title'])->toBe('ORDER SLIP')
+        ->and($job->payload['table_number'])->toBe(4)
+        ->and($job->payload['items'])->toHaveCount(1)
+        ->and($job->payload['items'][0]['name'])->toBe('Rice Bowl')
+        ->and($job->payload['items'][0]['quantity'])->toBe(1);
+
+    $this->assertDatabaseCount('print_jobs', 1);
+});
+
+test('failed order submission does not queue an order slip', function (): void {
+    $waiter = User::factory()->create(['role' => 'waiter']);
+    $product = Product::create([
+        'name' => 'Rice Bowl',
+        'selling_price' => 100,
+        'stock_quantity' => 0,
+    ]);
+
+    $this->actingAs($waiter)->postJson(route('orders.complete'), [
+        'table_number' => 4,
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertUnprocessable();
+
+    $this->assertDatabaseCount('orders', 0);
     $this->assertDatabaseCount('print_jobs', 0);
 });
 
@@ -55,6 +81,7 @@ test('retrying the same staff order request does not create another order or con
 
     expect($second->json('order_id'))->toBe($first->json('order_id'));
     $this->assertDatabaseCount('orders', 1);
+    $this->assertDatabaseCount('print_jobs', 1);
     $this->assertDatabaseHas('products', [
         'id' => $product->id,
         'stock_quantity' => 2,
@@ -80,16 +107,17 @@ test('one bridge claims and acknowledges each job only once', function (): void 
     $waiter = User::factory()->create(['role' => 'waiter']);
     $currentShiftId = SalesShift::query()->where('status', 'open')->value('id');
     $job = PrintJob::query()->create([
-        'job_type' => 'table_receipt',
-        'dedupe_key' => 'test-order-receipt',
-        'payload' => ['title' => 'TABLE RECEIPT', 'sales_shift_id' => $currentShiftId, 'items' => []],
+        'job_type' => 'order_slip',
+        'dedupe_key' => 'test-order-slip',
+        'payload' => ['title' => 'ORDER SLIP', 'sales_shift_id' => $currentShiftId, 'items' => []],
         'status' => 'pending',
     ]);
 
     $claim = $this->actingAs($waiter)
         ->getJson(route('print-jobs.next'))
         ->assertSuccessful()
-        ->assertJsonPath('id', $job->id);
+        ->assertJsonPath('id', $job->id)
+        ->assertJsonPath('job_type', 'order_slip');
 
     $this->getJson(route('print-jobs.next'))->assertNoContent();
 

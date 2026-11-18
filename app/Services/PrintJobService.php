@@ -9,6 +9,51 @@ use Illuminate\Support\Collection;
 
 class PrintJobService
 {
+    public function queueOrderSlip(Order $order): ?PrintJob
+    {
+        if ($order->status !== 'pending') {
+            return null;
+        }
+
+        $order->loadMissing('items');
+        $receiptTime = now('Asia/Manila');
+        $payload = [
+            'title' => 'ORDER SLIP',
+            'sales_shift_id' => $order->sales_shift_id,
+            'table_number' => $order->table_number,
+            'order_number' => $order->order_number,
+            'date' => $receiptTime->format('m/d/Y'),
+            'time' => $receiptTime->format('h:i A'),
+            'items' => $order->items->map(fn ($item): array => [
+                'name' => $item->product_name,
+                'quantity' => $item->quantity,
+                'add_ons' => collect($item->add_ons ?? [])->pluck('name')->all(),
+            ])->all(),
+        ];
+
+        $job = PrintJob::query()->firstOrCreate(
+            ['dedupe_key' => 'order-slip:'.$order->id],
+            [
+                'job_type' => 'order_slip',
+                'payload' => $payload,
+                'status' => 'pending',
+            ]
+        );
+
+        if ($job->status === 'failed') {
+            $job->update([
+                'payload' => $payload,
+                'status' => 'pending',
+                'claim_token' => null,
+                'claimed_at' => null,
+                'printed_at' => null,
+                'error_message' => null,
+            ]);
+        }
+
+        return $job;
+    }
+
     public function queueTableReceipt(int $tableNumber): ?PrintJob
     {
         $salesShiftId = SalesShift::query()

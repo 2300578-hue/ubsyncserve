@@ -193,16 +193,58 @@ if (bridge) {
         }
     }
 
+    function formatOrderSlip(payload) {
+        const esc = '\x1B';
+        const gs = '\x1D';
+        const orderNumber = shortenOrderNumber(payload.order_number ?? '');
+        const lines = [
+            `${esc}@`,
+            `${esc}a${String.fromCharCode(1)}UNIVERSITY OF BATANGAS\n`,
+            'Hilltop Rd. Batangas City, 4250 Batangas\n',
+            '-'.repeat(42),
+            `${esc}a${String.fromCharCode(1)}ORDER SLIP\n`,
+            `${esc}a${String.fromCharCode(0)}TABLE ${safeText(payload.table_number ?? 'WALK-IN')}\n`,
+            '-'.repeat(42),
+            fitColumns('ORDER ID:', safeText(orderNumber), 42),
+            fitColumns('DATE:', safeText(payload.date), 42),
+            fitColumns('TIME:', safeText(payload.time), 42),
+            '-'.repeat(42),
+            'QTY ITEM/S',
+        ];
+
+        for (const item of payload.items ?? []) {
+            const quantity = Number(item.quantity) || 0;
+            lines.push(`${quantity}x ${safeText(item.name).toUpperCase()}`.slice(0, 42));
+
+            for (const addOn of item.add_ons ?? []) {
+                lines.push(`  + ${safeText(addOn)}`.slice(0, 42));
+            }
+        }
+
+        lines.push(
+            '-'.repeat(42),
+            '',
+            `${esc}d${String.fromCharCode(3)}`,
+            `${gs}V${String.fromCharCode(0)}`,
+        );
+
+        return lines.join('\n');
+    }
+
     async function processJob(job) {
         setStatus(`Printing job ${job.id}…`);
 
         try {
             const config = qz.configs.create(printerName, { encoding: 'UTF-8' });
+            const data = job.job_type === 'order_slip'
+                ? formatOrderSlip(job.payload)
+                : formatReceipt(job.payload);
+
             await qz.print(config, [{
                 type: 'raw',
                 format: 'command',
                 flavor: 'plain',
-                data: formatReceipt(job.payload),
+                data,
             }]);
         } catch (error) {
             try {

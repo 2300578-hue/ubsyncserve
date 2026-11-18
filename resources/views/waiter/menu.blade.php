@@ -670,7 +670,9 @@
 
                 this.showOrderSummaryModal = false;
                 const notification = document.createElement('div');
-                notification.textContent = 'Order successfully sent to stations!';
+                notification.textContent = stockResult.print_job_queued
+                    ? 'Order successfully sent to stations. Order slip queued for printing!'
+                    : 'Order successfully sent to stations!';
                 notification.className = 'fixed top-5 right-5 z-[2000] rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white shadow-xl';
                 document.body.appendChild(notification);
                 window.setTimeout(() => notification.remove(), 2500);

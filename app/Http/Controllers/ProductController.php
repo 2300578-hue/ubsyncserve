@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\PrintJob;
 use App\Models\Product;
 use App\Models\SalesSetting;
 use App\Models\SalesShift;
+use App\Services\PrintJobService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ProductSeeder;
 use Illuminate\Http\JsonResponse;
@@ -49,7 +51,7 @@ class ProductController extends Controller
         return response()->json(['message' => 'Product deleted.']);
     }
 
-    public function completeOrder(Request $request): JsonResponse
+    public function completeOrder(Request $request, PrintJobService $printJobs): JsonResponse
     {
         $data = $request->validate([
             'idempotency_key' => ['nullable', 'uuid'],
@@ -74,16 +76,25 @@ class ProductController extends Controller
         }
 
         $idempotencyKey = $data['idempotency_key'] ?? null;
+        $shouldQueueOrderSlip = in_array(Auth::user()?->role, ['manager', 'waiter'], true);
         if ($idempotencyKey !== null) {
             $existingOrder = Order::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($existingOrder !== null) {
-                return response()->json($this->orderResponse($existingOrder), 200);
+                $printJob = $shouldQueueOrderSlip ? $printJobs->queueOrderSlip($existingOrder) : null;
+
+                return response()->json($this->orderResponse($existingOrder, $printJob), 200);
             }
         }
 
         $hasBookingTypeColumn = Schema::hasColumn('orders', 'booking_type');
 
-        $result = DB::transaction(function () use ($data, $hasBookingTypeColumn, $idempotencyKey): array {
+        $result = DB::transaction(function () use (
+            $data,
+            $hasBookingTypeColumn,
+            $idempotencyKey,
+            $printJobs,
+            $shouldQueueOrderSlip
+        ): array {
             $salesShift = SalesShift::query()
                 ->where('status', 'open')
                 ->lockForUpdate()
@@ -92,7 +103,13 @@ class ProductController extends Controller
             if ($idempotencyKey !== null) {
                 $existingOrder = Order::query()->where('idempotency_key', $idempotencyKey)->first();
                 if ($existingOrder !== null) {
-                    return ['order' => $existingOrder, 'duplicate' => true];
+                    return [
+                        'order' => $existingOrder,
+                        'duplicate' => true,
+                        'print_job' => $shouldQueueOrderSlip
+                            ? $printJobs->queueOrderSlip($existingOrder)
+                            : null,
+                    ];
                 }
             }
 
@@ -274,28 +291,32 @@ class ProductController extends Controller
                 $order->items()->create($orderItem);
             }
 
+            $printJob = $shouldQueueOrderSlip ? $printJobs->queueOrderSlip($order) : null;
+
             return [
                 'order' => $order,
                 'duplicate' => false,
+                'print_job' => $printJob,
             ];
         });
 
         return response()->json(
-            $this->orderResponse($result['order']),
+            $this->orderResponse($result['order'], $result['print_job']),
             $result['duplicate'] ? 200 : 201
         );
     }
 
     /**
-     * @return array<string, int|float|string|bool>
+     * @return array<string, int|float|string|bool|null>
      */
-    private function orderResponse(Order $order): array
+    private function orderResponse(Order $order, ?PrintJob $printJob = null): array
     {
         return [
             'message' => 'Order saved and inventory updated.',
             'order_id' => $order->id,
             'order_number' => $order->order_number,
-            'print_job_queued' => false,
+            'print_job_queued' => $printJob !== null && $printJob->status !== 'printed',
+            'print_job_id' => $printJob?->status === 'printed' ? null : $printJob?->id,
             'total_amount' => (float) $order->total_amount,
             'subtotal_amount' => (float) $order->subtotal_amount,
             'discount_amount' => (float) $order->discount_amount,

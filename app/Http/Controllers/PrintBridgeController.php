@@ -65,7 +65,7 @@ class PrintBridgeController extends Controller
                 }
 
                 if (
-                    $candidate->job_type === 'table_receipt'
+                    in_array($candidate->job_type, ['table_receipt', 'order_slip'], true)
                     && (
                         $currentShiftId === null
                         || (int) ($candidate->payload['sales_shift_id'] ?? 0) !== (int) $currentShiftId
@@ -73,7 +73,7 @@ class PrintBridgeController extends Controller
                 ) {
                     $candidate->update([
                         'status' => 'failed',
-                        'error_message' => 'This receipt belongs to a different or expired sales shift. Confirm Print again to create a current receipt.',
+                        'error_message' => 'This print job belongs to a different or expired sales shift.',
                     ]);
 
                     continue;
@@ -98,6 +98,7 @@ class PrintBridgeController extends Controller
 
         return response()->json([
             'id' => $job->id,
+            'job_type' => $job->job_type,
             'claim_token' => $job->claim_token,
             'payload' => $job->payload,
         ]);
