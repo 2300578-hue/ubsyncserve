@@ -14,6 +14,13 @@ test('database seeder creates an idempotent verified main admin who can log in',
         'admin.password' => $password,
     ]);
 
+    User::factory()->create([
+        'email' => '2300578@ub.edu.ph',
+        'password' => 'old-password',
+        'role' => 'waiter',
+        'email_verified_at' => null,
+    ]);
+
     $this->seed(DatabaseSeeder::class);
     $this->seed(DatabaseSeeder::class);
 

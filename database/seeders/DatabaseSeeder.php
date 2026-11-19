@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
             throw new RuntimeException('Set ADMIN_PASSWORD to a value of at least 12 characters before running the database seeder.');
         }
 
-        User::firstOrCreate(
+        User::updateOrCreate(
             ['email' => config('admin.email')],
             [
                 'name' => config('admin.name'),
