@@ -20,6 +20,30 @@ beforeEach(function (): void {
     ]);
 });
 
+test('the bridge serves a certificate configured as base64', function (): void {
+    $manager = User::query()->where('role', 'manager')->firstOrFail();
+    $certificate = "-----BEGIN CERTIFICATE-----\nQ0VSVElGSUNBVEU=\n-----END CERTIFICATE-----\n";
+
+    config(['services.qz.certificate_base64' => base64_encode($certificate)]);
+
+    $response = $this->actingAs($manager)->get(route('qz.certificate'));
+
+    $response->assertSuccessful();
+    expect($response->getContent())->toBe($certificate);
+});
+
+test('the bridge reads a private key configured as base64', function (): void {
+    $manager = User::query()->where('role', 'manager')->firstOrFail();
+    config(['services.qz.private_key_base64' => base64_encode('not a private key')]);
+
+    $response = $this->actingAs($manager)->postJson(route('qz.sign'), [
+        'request' => 'qz test request',
+    ]);
+
+    $response->assertServiceUnavailable()
+        ->assertSeeText('The configured QZ Tray private key is invalid.');
+});
+
 test('staff table order submission queues an order slip', function (): void {
     $waiter = User::factory()->create(['role' => 'waiter']);
     $product = Product::create([

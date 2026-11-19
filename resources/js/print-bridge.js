@@ -5,6 +5,7 @@ if (bridge) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     const printerName = bridge.dataset.printerName;
     let qz;
+    let signatureRequestError = null;
 
     function setStatus(message) {
         status.textContent = message;
@@ -53,25 +54,30 @@ if (bridge) {
         });
         qz.security.setSignatureAlgorithm('SHA512');
         qz.security.setSignaturePromise((toSign) => (resolve, reject) => {
+            signatureRequestError = null;
             fetch(bridge.dataset.signatureUrl, {
                 method: 'POST',
                 cache: 'no-store',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'text/plain',
+                    Accept: 'application/json, text/plain',
                 },
                 body: JSON.stringify({ request: toSign }),
             })
                 .then(async (response) => {
                     if (!response.ok) {
-                        throw new Error(await response.text());
+                        const message = (await response.text()).slice(0, 500);
+                        throw new Error(`QZ signing endpoint returned ${response.status}: ${message}`);
                     }
 
                     return response.text();
                 })
                 .then(resolve)
-                .catch(reject);
+                .catch((error) => {
+                    signatureRequestError = error;
+                    reject(error);
+                });
         });
     }
 
@@ -300,7 +306,11 @@ if (bridge) {
                 await processJob(await response.json());
             } catch (error) {
                 printerReady = false;
-                setStatus(`Print bridge error: ${error.message}`);
+                const message = error.message === 'Failed to sign request' && signatureRequestError
+                    ? signatureRequestError.message
+                    : error.message;
+                signatureRequestError = null;
+                setStatus(`Print bridge error: ${message}`);
                 await delay(2000);
             }
         }

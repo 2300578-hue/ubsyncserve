@@ -178,14 +178,11 @@ class PrintBridgeController extends Controller
     public function certificate(Request $request): Response
     {
         $this->authorizeStaff($request);
-        $certificatePath = $this->resolveConfiguredPath(config('services.qz.certificate_path'));
-
-        abort_unless($certificatePath !== null && is_file($certificatePath), 503, 'QZ Tray certificate is not configured.');
-
-        $certificate = file_get_contents($certificatePath);
-        if ($certificate === false) {
-            abort(503, 'Unable to read the configured QZ Tray certificate.');
-        }
+        $certificate = $this->configuredContents(
+            config('services.qz.certificate_base64'),
+            config('services.qz.certificate_path'),
+            'certificate'
+        );
 
         return response($certificate, 200, [
             'Content-Type' => 'text/plain; charset=UTF-8',
@@ -195,14 +192,11 @@ class PrintBridgeController extends Controller
 
     public function sign(SignQzMessageRequest $request): Response
     {
-        $privateKeyPath = $this->resolveConfiguredPath(config('services.qz.private_key_path'));
-
-        abort_unless($privateKeyPath !== null && is_file($privateKeyPath), 503, 'QZ Tray private key is not configured.');
-
-        $privateKeyContents = file_get_contents($privateKeyPath);
-        if ($privateKeyContents === false) {
-            abort(503, 'Unable to read the configured QZ Tray private key.');
-        }
+        $privateKeyContents = $this->configuredContents(
+            config('services.qz.private_key_base64'),
+            config('services.qz.private_key_path'),
+            'private key'
+        );
 
         $privateKey = openssl_pkey_get_private($privateKeyContents);
         if ($privateKey === false) {
@@ -218,6 +212,34 @@ class PrintBridgeController extends Controller
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Cache-Control' => 'no-store, private',
         ]);
+    }
+
+    private function configuredContents(mixed $base64Contents, mixed $path, string $resource): string
+    {
+        if (is_string($base64Contents) && trim($base64Contents) !== '') {
+            $contents = base64_decode($base64Contents, true);
+            abort_unless(
+                is_string($contents) && $contents !== '',
+                503,
+                "Configured QZ Tray {$resource} is not valid base64."
+            );
+
+            return $contents;
+        }
+
+        $configuredPath = $this->resolveConfiguredPath($path);
+        abort_unless(
+            $configuredPath !== null && is_file($configuredPath),
+            503,
+            "QZ Tray {$resource} is not configured."
+        );
+
+        $contents = file_get_contents($configuredPath);
+        if ($contents === false) {
+            abort(503, "Unable to read the configured QZ Tray {$resource}.");
+        }
+
+        return $contents;
     }
 
     private function resolveConfiguredPath(mixed $path): ?string

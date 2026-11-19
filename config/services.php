@@ -37,7 +37,9 @@ return [
 
     'qz' => [
         'certificate_path' => env('QZ_CERT_PATH', env('QZ_CERTIFICATE_PATH', 'storage/app/qz/digital-certificate.txt')),
+        'certificate_base64' => env('QZ_CERTIFICATE_BASE64'),
         'private_key_path' => env('QZ_PRIVATE_KEY_PATH', 'storage/app/qz/private-key.pem'),
+        'private_key_base64' => env('QZ_PRIVATE_KEY_BASE64'),
         'printer_name' => env('QZ_PRINTER_NAME', 'Generic / Text Only'),
     ],
 
