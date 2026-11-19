@@ -207,7 +207,9 @@
                     this.reservationError = '';
 
                     try {
-                        const response = await fetch(`/booking/${encodeURIComponent(this.reservationId)}/table-details`, {
+                        const detailsUrl = @json(route('customer.booking.table-details', ['bookingReference' => '__BOOKING_REFERENCE__']));
+                        const url = detailsUrl.replace('__BOOKING_REFERENCE__', encodeURIComponent(this.reservationId));
+                        const response = await fetch(url, {
                             headers: { 'Accept': 'application/json' },
                             cache: 'no-store'
                         });

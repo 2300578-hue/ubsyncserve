@@ -7,6 +7,16 @@ use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
+test('table selection builds the reservation details URL from the named route', function () {
+    $bookingDetailsUrl = route('customer.booking.table-details', [
+        'bookingReference' => '__BOOKING_REFERENCE__',
+    ]);
+
+    $this->get(route('order.select-tables'))
+        ->assertSuccessful()
+        ->assertSee(str_replace('/', '\\/', $bookingDetailsUrl), false);
+});
+
 test('reservation requests require a Gmail address', function () {
     $this->postJson(route('customer.book.post'), [
         'type' => 'table-reservation',
