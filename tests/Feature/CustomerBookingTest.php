@@ -38,6 +38,44 @@ test('reservation confirmation endpoints require an authenticated staff account'
         ->assertUnauthorized();
 });
 
+test('confirmation email is only sent for an active confirmed reservation', function () {
+    $staff = User::factory()->create(['role' => 'manager']);
+    $reservation = $this->postJson(route('customer.book.post'), [
+        'type' => 'advance-order',
+        'name' => 'Jane Doe',
+        'email' => 'jane.doe@gmail.com',
+        'phone' => '09123456789',
+        'date' => now()->addDay()->toDateString(),
+        'time' => '18:00',
+        'adults' => 2,
+        'children' => 0,
+    ])->assertCreated();
+    $bookingReference = DB::table('customer_bookings')
+        ->where('id', $reservation->json('booking_id'))
+        ->value('booking_reference');
+
+    $this->actingAs($staff)
+        ->postJson(route('reservation.confirm.email'), [
+            'id' => $bookingReference,
+            'name' => 'Jane Doe',
+            'email' => 'jane.doe@gmail.com',
+            'date' => now()->addDay()->toDateString(),
+            'time' => '18:00',
+            'type' => 'advance-order',
+        ])->assertConflict()
+        ->assertJsonPath('message', 'Confirm the reservation before sending its table-selection link.');
+
+    $this->postJson(route('reservation.confirm.email'), [
+        'id' => 'RES-DOES-NOT-EXIST',
+        'name' => 'Jane Doe',
+        'email' => 'jane.doe@gmail.com',
+        'date' => now()->addDay()->toDateString(),
+        'time' => '18:00',
+        'type' => 'advance-order',
+    ])->assertNotFound()
+        ->assertJsonPath('message', 'Reservation not found or no longer active.');
+});
+
 test('only one reservation using a Gmail account can be confirmed', function () {
     $manager = User::factory()->create(['role' => 'manager']);
     $reservationData = [

@@ -36,18 +36,31 @@ class ReservationEmailController extends Controller
                 ->whereNull('archived_at')
                 ->first();
 
-            if ($booking) {
-                $claimed = DB::table('customer_bookings')
-                    ->where('id', $booking->id)
-                    ->whereNull('confirmation_email_sent_at')
-                    ->update([
-                        'confirmation_email_sent_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+            if ($booking === null) {
+                return response()->json(['message' => 'Reservation not found or no longer active.'], 404);
+            }
 
-                if ($claimed === 0) {
-                    return response()->json(['success' => true, 'already_sent' => true]);
-                }
+            if ($booking->status !== 'confirmed') {
+                return response()->json(['message' => 'Confirm the reservation before sending its table-selection link.'], 409);
+            }
+
+            $data['name'] = $booking->name;
+            $data['email'] = $booking->email;
+            $data['date'] = $booking->booking_date;
+            $data['time'] = $booking->booking_time;
+            $data['type'] = $booking->type;
+            $data['id'] = $booking->booking_reference;
+
+            $claimed = DB::table('customer_bookings')
+                ->where('id', $booking->id)
+                ->whereNull('confirmation_email_sent_at')
+                ->update([
+                    'confirmation_email_sent_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+            if ($claimed === 0) {
+                return response()->json(['success' => true, 'already_sent' => true]);
             }
 
             $selectTablesUrl = route('order.select-tables').'?type='

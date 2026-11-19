@@ -49,7 +49,9 @@ class CustomerBookingController extends Controller
             ->first(['booking_reference', 'type', 'adults', 'children', 'guests', 'status']);
 
         if ($booking === null) {
-            return response()->json(['message' => 'Confirmed reservation not found.'], 404);
+            return response()->json([
+                'message' => 'This reservation link is invalid or no longer active. Please contact staff for a new confirmed link.',
+            ], 404);
         }
 
         return response()->json([
