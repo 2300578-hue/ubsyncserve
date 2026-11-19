@@ -27,7 +27,7 @@ test('invalid login credentials return a generic email and password message', fu
         ->assertJsonPath('message', 'Invalid email or password.');
 });
 
-test('only the configured admin email can log in as a manager', function () {
+test('manager accounts can log in regardless of the configured admin email', function () {
     config(['admin.email' => 'manager@example.com']);
 
     $manager = User::factory()->create([
@@ -36,15 +36,12 @@ test('only the configured admin email can log in as a manager', function () {
         'role' => 'manager',
     ]);
 
-    $response = $this->postJson(route('login.post'), [
+    $this->postJson(route('login.post'), [
         'email' => $manager->email,
         'password' => 'correct-password',
-    ]);
-
-    $response->assertUnprocessable()
-        ->assertJsonPath('message', 'Invalid email or password.');
-
-    $this->assertGuest();
+    ])
+        ->assertSuccessful()
+        ->assertJsonPath('redirect', route('manager.dashboard'));
 });
 
 test('waiter accounts can still log in when the admin email is configured', function () {

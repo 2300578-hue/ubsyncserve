@@ -206,14 +206,6 @@ Route::middleware(['guest'])->group(function () {
         ]);
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
-            if ($user->role === 'manager' && strcasecmp($user->email, (string) config('admin.email')) !== 0) {
-                Auth::logout();
-
-                return response()->json([
-                    'message' => 'Invalid email or password.',
-                ], 422);
-            }
-
             $request->session()->regenerate();
             $route = $user->role === 'manager' ? 'manager.dashboard' : 'waiter.dashboard';
 
