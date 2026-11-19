@@ -420,9 +420,14 @@
                             })
                         });
 
-                        const data = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        const data = contentType.includes('application/json') ? await response.json() : {};
+                        if (response.status === 419) {
+                            throw new Error('Invalid email or password.');
+                        }
+
                         if (!response.ok) {
-                            throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Invalid credentials.');
+                            throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Invalid email or password.');
                         }
 
                         window.location.href = data.redirect;

@@ -12,16 +12,16 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'manager'])->prefix('manager')->group(function () {
-    Route::get('/', function () {
+Route::middleware(['auth', 'manager'])->group(function () {
+    Route::get('/manager', function () {
         return view('manager.manager', ['activeTab' => 'analytics']);
     })->name('manager.home');
 
-    Route::get('/dashboard', function () {
+    Route::get('/reports', function () {
         return view('manager.manager', ['activeTab' => 'analytics']);
     })->name('manager.dashboard');
 
-    Route::get('/open-tables', function () {
+    Route::get('/tables', function () {
         return view('manager.manager', ['activeTab' => 'tables']);
     })->name('manager.open-tables');
 
@@ -29,143 +29,137 @@ Route::middleware(['auth', 'manager'])->prefix('manager')->group(function () {
         return view('manager.manager', ['activeTab' => 'inventory']);
     })->name('manager.inventory');
 
-    Route::get('/sales-history', function () {
+    Route::get('/sales', function () {
         return view('manager.manager', ['activeTab' => 'saleshistory']);
     })->name('manager.sales-history');
 });
 
-Route::middleware(['auth', 'manager'])->prefix('api/manager')->name('manager.api.')->group(function () {
-    Route::get('/sales-shift', [SalesShiftController::class, 'show'])->name('sales-shift.show');
-    Route::get('/sales-shift/export', [SalesShiftController::class, 'export'])->name('sales-shift.export');
-    Route::post('/sales-shift/start', [SalesShiftController::class, 'start'])->name('sales-shift.start');
-    Route::post('/sales-shift/close', [SalesShiftController::class, 'close'])->name('sales-shift.close');
-    Route::put('/sales-settings', [SalesShiftController::class, 'updateSettings'])->name('sales-settings.update');
+Route::middleware(['auth', 'manager'])->name('manager.api.')->group(function () {
+    Route::get('/shift', [SalesShiftController::class, 'show'])->name('sales-shift.show');
+    Route::get('/shift/export', [SalesShiftController::class, 'export'])->name('sales-shift.export');
+    Route::post('/shift/start', [SalesShiftController::class, 'start'])->name('sales-shift.start');
+    Route::post('/shift/close', [SalesShiftController::class, 'close'])->name('sales-shift.close');
+    Route::put('/settings', [SalesShiftController::class, 'updateSettings'])->name('sales-settings.update');
 });
 
-Route::get('/api/products', [ProductController::class, 'index'])->name('products.index');
-Route::post('/api/products', [ProductController::class, 'store'])->name('products.store');
-Route::put('/api/products/{product}', [ProductController::class, 'update'])->name('products.update');
-Route::delete('/api/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
-Route::post('/api/orders/complete', [ProductController::class, 'completeOrder'])->name('orders.complete');
+Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
+Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+Route::post('/orders', [ProductController::class, 'completeOrder'])->name('orders.complete');
+
 Route::middleware(['auth', 'throttle:120,1'])->group(function () {
-    Route::get('/print-bridge', [PrintBridgeController::class, 'index'])->name('print-bridge');
-    Route::get('/api/print-jobs/next', [PrintBridgeController::class, 'claimNext'])->name('print-jobs.next');
-    Route::post('/api/print-jobs/tables/{tableNumber}', [PrintBridgeController::class, 'queueTableReceipt'])
+    Route::get('/print', [PrintBridgeController::class, 'index'])->name('print-bridge');
+    Route::get('/jobs/next', [PrintBridgeController::class, 'claimNext'])->name('print-jobs.next');
+    Route::post('/receipts/{tableNumber}', [PrintBridgeController::class, 'queueTableReceipt'])
         ->whereNumber('tableNumber')
         ->name('print-jobs.tables');
-    Route::post('/api/print-jobs/tables/{tableNumber}/advance-order-slips', [PrintBridgeController::class, 'queueTableAdvanceOrderSlips'])
+    Route::post('/slips/{tableNumber}', [PrintBridgeController::class, 'queueTableAdvanceOrderSlips'])
         ->whereNumber('tableNumber')
         ->name('print-jobs.advance-order-slips');
-    Route::post('/api/print-jobs/{printJob}/printed', [PrintBridgeController::class, 'markPrinted'])
+    Route::post('/jobs/{printJob}/printed', [PrintBridgeController::class, 'markPrinted'])
         ->whereNumber('printJob')
         ->name('print-jobs.printed');
-    Route::post('/api/print-jobs/{printJob}/failed', [PrintBridgeController::class, 'markFailed'])
+    Route::post('/jobs/{printJob}/failed', [PrintBridgeController::class, 'markFailed'])
         ->whereNumber('printJob')
         ->name('print-jobs.failed');
-    Route::get('/api/print-jobs/{printJob}', [PrintBridgeController::class, 'show'])
+    Route::get('/jobs/{printJob}', [PrintBridgeController::class, 'show'])
         ->whereNumber('printJob')
         ->name('print-jobs.show');
-    Route::get('/api/qz/certificate', [PrintBridgeController::class, 'certificate'])->name('qz.certificate');
-    Route::post('/api/qz/sign', [PrintBridgeController::class, 'sign'])->name('qz.sign');
+    Route::get('/certificate', [PrintBridgeController::class, 'certificate'])->name('qz.certificate');
+    Route::post('/sign', [PrintBridgeController::class, 'sign'])->name('qz.sign');
 });
-Route::middleware('auth')->post('/api/orders/settle-table/{tableNumber}', [SalesShiftController::class, 'settleTable'])
+
+Route::middleware('auth')->post('/settle/{tableNumber}', [SalesShiftController::class, 'settleTable'])
     ->whereNumber('tableNumber')
     ->name('orders.settle-table');
-Route::get('/api/tables', [TableStateController::class, 'index'])->name('tables.index');
-Route::put('/api/tables', [TableStateController::class, 'update'])->name('tables.update');
-Route::post('/api/tables/{tableNumber}/clear', [TableStateController::class, 'clear'])
+Route::get('/table-state', [TableStateController::class, 'index'])->name('tables.index');
+Route::put('/table-state', [TableStateController::class, 'update'])->name('tables.update');
+Route::post('/clear/{tableNumber}', [TableStateController::class, 'clear'])
     ->whereNumber('tableNumber')
     ->name('tables.clear');
-Route::get('/csrf-token', function () {
+Route::get('/csrf', function () {
     return response()
         ->json(['token' => csrf_token()])
         ->header('Cache-Control', 'no-store, private');
 })->name('csrf-token');
 
-Route::prefix('waiter')->group(function () {
-
-    Route::get('/', function () {
+Route::middleware('auth')->group(function () {
+    Route::get('/waiter', function () {
         return view('waiter.waiter');
     })->name('waiter.home');
 
-    // Dashboard (waiter.blade.php)
     Route::get('/dashboard', function () {
         return view('waiter.waiter');
     })->name('waiter.dashboard');
 
-    // Menu/POS (menu.blade.php)
-    Route::get('/menu', function () {
+    Route::get('/pos', function () {
         return view('waiter.menu');
     })->name('waiter.menu');
 
-    // Reservation Hub (reservation.blade.php)
-    // Ang URL nito ay: 127.0.0.1:8000/waiter/reservation
-    Route::get('/reservation', function () {
+    Route::get('/reservations', function () {
         abort_unless(in_array(Auth::user()?->role, ['manager', 'waiter'], true), 403);
 
         return view('waiter.reservation');
-    })->middleware('auth')->name('waiter.reservation');
-
+    })->name('waiter.reservation');
 });
 
-Route::prefix('order')->group(function () {
-    Route::get('/qrcodes', function () {
-        return view('customer.qr-code');
-    })->name('order.qrcodes');
+Route::get('/qr', function () {
+    return view('customer.qr-code');
+})->name('order.qrcodes');
 
-    Route::get('/qrcodes{table}', function (string $table) {
-        $tableNumber = intval($table);
-        if ($tableNumber < 1 || $tableNumber > 15) {
-            abort(404);
-        }
+Route::get('/qr/{table}', function (string $table) {
+    $tableNumber = intval($table);
+    if ($tableNumber < 1 || $tableNumber > 15) {
+        abort(404);
+    }
 
-        return redirect()->route('order.select-booking');
-    })->where('table', '[1-9]|1[0-5]')->name('order.qrcodes.single');
+    return redirect()->route('order.select-booking');
+})->where('table', '[1-9]|1[0-5]')->name('order.qrcodes.single');
 
-    Route::get('/select/{table?}', function (?int $table = null) {
-        return view('customer.select-tables', ['table' => $table]);
-    })->where('table', '[1-9]|1[0-5]')->name('order.select-tables');
+Route::get('/select/{table?}', function (?int $table = null) {
+    return view('customer.select-tables', ['table' => $table]);
+})->where('table', '[1-9]|1[0-5]')->name('order.select-tables');
 
-    Route::get('/select-booking', function () {
-        return view('customer.booking-choice');
-    })->name('order.select-booking');
+Route::get('/reserve', function () {
+    return view('customer.booking-choice');
+})->name('order.select-booking');
 
-    Route::get('/choice', function () {
-        return redirect()->route('order.select-booking');
-    })->name('order.booking-choice');
+Route::get('/choice', function () {
+    return redirect()->route('order.select-booking');
+})->name('order.booking-choice');
 
-    Route::get('/setup{table}', function (string $table) {
-        $tableNumber = intval($table);
-        if ($tableNumber < 1 || $tableNumber > 15) {
-            abort(404);
-        }
+Route::get('/setup/{table}', function (string $table) {
+    $tableNumber = intval($table);
+    if ($tableNumber < 1 || $tableNumber > 15) {
+        abort(404);
+    }
 
-        return redirect()->route('order.menu', ['table' => $tableNumber]);
-    })->where('table', '[1-9]|1[0-5]')->name('order.setup');
+    return redirect()->route('order.menu', ['table' => $tableNumber]);
+})->where('table', '[1-9]|1[0-5]')->name('order.setup');
 
-    Route::get('/menu', function () {
-        return view('customer.customer-menu');
-    })->name('order.menu');
+Route::get('/menu', function () {
+    return view('customer.customer-menu');
+})->name('order.menu');
 
-    Route::get('/cart', function () {
-        return view('customer.cart');
-    })->name('order.cart');
+Route::get('/cart', function () {
+    return view('customer.cart');
+})->name('order.cart');
 
-    Route::get('/checkout', function () {
-        return view('customer.checkout');
-    })->name('order.checkout');
-});
+Route::get('/checkout', function () {
+    return view('customer.checkout');
+})->name('order.checkout');
 
 Route::get('/order', function () {
     return redirect()->route('order.select-booking');
 });
 
 Route::post('/book', [CustomerBookingController::class, 'store'])->name('customer.book.post');
-Route::get('/booking/{bookingReference}/table-details', [CustomerBookingController::class, 'tableDetails'])
+Route::get('/booking/{bookingReference}', [CustomerBookingController::class, 'tableDetails'])
     ->name('customer.booking.table-details');
 Route::middleware('auth')->group(function () {
     Route::get('/bookings', [CustomerBookingController::class, 'index'])->name('customer.bookings.index');
-    Route::patch('/bookings/{bookingReference}/status', [CustomerBookingController::class, 'updateStatus'])
+    Route::patch('/bookings/{bookingReference}', [CustomerBookingController::class, 'updateStatus'])
         ->name('customer.bookings.status');
     Route::delete('/bookings/{bookingReference}', [CustomerBookingController::class, 'archive'])
         ->name('customer.bookings.archive');
@@ -177,33 +171,32 @@ Route::get('/book', function () {
     return view('customer.book');
 })->name('customer.book');
 
-Route::middleware('auth')->post('/reservation/confirm-email', [ReservationEmailController::class, 'confirmEmail'])
+Route::middleware('auth')->post('/confirm', [ReservationEmailController::class, 'confirmEmail'])
     ->name('reservation.confirm.email');
 
-// Redirect root to dashboard
 Route::get('/', function () {
-    return redirect()->route('login');
+    return view('login.login');
 });
 
 Route::middleware(['guest'])->group(function () {
     Route::get('/login', function () {
         return view('login.login');
     })->name('login');
-    Route::get('/create-account', function () {
+    Route::get('/signup', function () {
         return view('login.create-account');
     })->name('create-account');
-    Route::post('/create-account/send-code', [AccountRegistrationController::class, 'sendCode'])->name('create-account.send-code');
-    Route::post('/create-account/verify-code', [AccountRegistrationController::class, 'verifyCode'])->name('create-account.verify-code');
-    Route::get('/forgot-password', function () {
+    Route::post('/signup/send', [AccountRegistrationController::class, 'sendCode'])->name('create-account.send-code');
+    Route::post('/signup/verify', [AccountRegistrationController::class, 'verifyCode'])->name('create-account.verify-code');
+    Route::get('/forgot', function () {
         return view('login.login');
     })->name('forgot-password');
-    Route::post('/forgot-password/send-code', [PasswordResetController::class, 'sendCode'])
+    Route::post('/forgot/send', [PasswordResetController::class, 'sendCode'])
         ->middleware('throttle:3,1')
         ->name('password-reset.send-code');
-    Route::post('/forgot-password/verify-code', [PasswordResetController::class, 'verifyCode'])
+    Route::post('/forgot/verify', [PasswordResetController::class, 'verifyCode'])
         ->middleware('throttle:10,1')
         ->name('password-reset.verify-code');
-    Route::post('/forgot-password/reset', [PasswordResetController::class, 'resetPassword'])
+    Route::post('/reset', [PasswordResetController::class, 'resetPassword'])
         ->middleware('throttle:10,1')
         ->name('password-reset.reset');
     Route::post('/login', function (Request $request) {
@@ -221,7 +214,7 @@ Route::middleware(['guest'])->group(function () {
         }
 
         return response()->json([
-            'message' => 'Invalid credentials.',
+            'message' => 'Invalid email or password.',
         ], 422);
     })->name('login.post');
 });

@@ -11,7 +11,7 @@
     <main
         id="print-bridge"
         data-next-url="{{ route('print-jobs.next') }}"
-        data-job-url="{{ url('/api/print-jobs') }}"
+        data-job-url="{{ url('/jobs') }}"
         data-certificate-url="{{ route('qz.certificate') }}"
         data-signature-url="{{ route('qz.sign') }}"
         data-printer-name="{{ config('services.qz.printer_name') }}"

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use RuntimeException;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,21 +16,18 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::firstOrCreate(
-            ['email' => 'manager@ubsyncserve.com'],
-            [
-                'name' => 'Manager',
-                'password' => bcrypt('manager123'),
-                'role' => 'manager',
-            ],
-        );
+        $adminPassword = config('admin.password');
+        if (! is_string($adminPassword) || mb_strlen($adminPassword) < 12) {
+            throw new RuntimeException('Set ADMIN_PASSWORD to a value of at least 12 characters before running the database seeder.');
+        }
 
         User::firstOrCreate(
-            ['email' => 'waiter@ubsyncserve.com'],
+            ['email' => config('admin.email')],
             [
-                'name' => 'Waiter',
-                'password' => bcrypt('waiter123'),
-                'role' => 'waiter',
+                'name' => config('admin.name'),
+                'password' => $adminPassword,
+                'role' => 'manager',
+                'email_verified_at' => now(),
             ],
         );
 

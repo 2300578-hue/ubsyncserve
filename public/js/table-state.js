@@ -2,7 +2,7 @@ window.tableStateApi = {
     inFlightLoad: null,
 
     async refreshCsrfToken() {
-        const response = await fetch('/csrf-token', {
+        const response = await fetch('/csrf', {
             headers: { 'Accept': 'application/json' },
             cache: 'no-store'
         });
@@ -35,7 +35,7 @@ window.tableStateApi = {
     },
 
     async fetchTables() {
-        const response = await fetch('/api/tables', {
+        const response = await fetch('/table-state', {
             headers: { 'Accept': 'application/json' }
         });
 
@@ -47,7 +47,7 @@ window.tableStateApi = {
     },
 
     async save(tables) {
-        const sendSaveRequest = (token) => fetch('/api/tables', {
+        const sendSaveRequest = (token) => fetch('/table-state', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -76,7 +76,7 @@ window.tableStateApi = {
     },
 
     async clear(tableNumber) {
-        const sendClearRequest = (token) => fetch(`/api/tables/${encodeURIComponent(tableNumber)}/clear`, {
+        const sendClearRequest = (token) => fetch(`/clear/${encodeURIComponent(tableNumber)}`, {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': token,

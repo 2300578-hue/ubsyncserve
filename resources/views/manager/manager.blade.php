@@ -48,7 +48,7 @@
     id="print-bridge"
     hidden
     data-next-url="{{ route('print-jobs.next') }}"
-    data-job-url="{{ url('/api/print-jobs') }}"
+    data-job-url="{{ url('/jobs') }}"
     data-certificate-url="{{ route('qz.certificate') }}"
     data-signature-url="{{ route('qz.sign') }}"
     data-printer-name="{{ config('services.qz.printer_name') }}"
@@ -278,7 +278,7 @@
                 async saveProductToDatabase(product) {
                     const isEditing = product.id !== null && product.id !== undefined;
                     const url = isEditing
-                        ? `{{ url('/api/products') }}/${product.id}`
+                        ? `{{ route('products.index') }}/${product.id}`
                         : '{{ route('products.store') }}';
                     const response = await fetch(url, {
                         method: isEditing ? 'PUT' : 'POST',
@@ -654,7 +654,7 @@ async updateReservationStatus(id, newStatus) {
     const reservation = this.reservations[index];
     try {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        const statusResponse = await fetch(`/bookings/${encodeURIComponent(id)}/status`, {
+        const statusResponse = await fetch(`/bookings/${encodeURIComponent(id)}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
@@ -679,7 +679,7 @@ async updateReservationStatus(id, newStatus) {
             return;
         }
 
-        const emailResponse = await fetch('/reservation/confirm-email', {
+        const emailResponse = await fetch('/confirm', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -749,7 +749,7 @@ async clearAllReservations() {
 
 async cancelReservation(id) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    const response = await fetch(`/bookings/${encodeURIComponent(id)}/status`, {
+    const response = await fetch(`/bookings/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',
@@ -1014,7 +1014,7 @@ async clearTable(tableId) {
                         this.deletingProductId = productId;
 
                         try {
-                            const response = await fetch(`{{ url('/api/products') }}/${productId}`, {
+                            const response = await fetch(`{{ route('products.index') }}/${productId}`, {
                                 method: 'DELETE',
                                 headers: {
                                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
@@ -1249,7 +1249,7 @@ await this.loadProducts();
 
                             await this.waitForPrintJob(receiptResult.job_id);
 
-                            const response = await fetch(`{{ url('/api/orders/settle-table') }}/${tableId}`, {
+                            const response = await fetch(`{{ url('/settle') }}/${tableId}`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',

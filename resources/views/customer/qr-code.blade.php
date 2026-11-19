@@ -24,7 +24,7 @@
             <!-- QR Code Area (No Hover Effect) -->
             <div class="mt-10 mb-8">
                 <div class="inline-block p-4 bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-100">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data={{ urlencode(url('/order/choice')) }}" 
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=320x320&data={{ urlencode(route('order.booking-choice')) }}"
                          alt="QR Code" 
                          class="w-56 h-56 mx-auto rounded-xl" />
                 </div>

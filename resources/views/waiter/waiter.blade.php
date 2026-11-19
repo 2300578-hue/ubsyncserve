@@ -39,7 +39,7 @@
     id="print-bridge"
     hidden
     data-next-url="{{ route('print-jobs.next') }}"
-    data-job-url="{{ url('/api/print-jobs') }}"
+    data-job-url="{{ url('/jobs') }}"
     data-certificate-url="{{ route('qz.certificate') }}"
     data-signature-url="{{ route('qz.sign') }}"
     data-printer-name="{{ config('services.qz.printer_name') }}"
@@ -1019,7 +1019,7 @@ async startSession() {
             
             try {
                 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                const statusResponse = await fetch(`/bookings/${encodeURIComponent(resId)}/status`, {
+                const statusResponse = await fetch(`/bookings/${encodeURIComponent(resId)}`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1039,7 +1039,7 @@ async startSession() {
                 reservation.status = 'confirmed';
                 this.updateReservationStorage();
 
-                const emailResponse = await fetch('/reservation/confirm-email', {
+                const emailResponse = await fetch('/confirm', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1103,7 +1103,7 @@ async startSession() {
 
         async cancelReservation(resId) {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            const response = await fetch(`/bookings/${encodeURIComponent(resId)}/status`, {
+            const response = await fetch(`/bookings/${encodeURIComponent(resId)}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1336,7 +1336,7 @@ async startSession() {
 
                     await this.waitForPrintJob(receiptResult.job_id);
 
-                    const paymentResponse = await fetch(`{{ url('/api/orders/settle-table') }}/${tableId}`, {
+                    const paymentResponse = await fetch(`{{ url('/settle') }}/${tableId}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
