@@ -653,12 +653,10 @@ async updateReservationStatus(id, newStatus) {
 
     const reservation = this.reservations[index];
     try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        const statusResponse = await fetch(`/bookings/${encodeURIComponent(id)}`, {
+        const statusResponse = await window.tableStateApi.requestWithCsrf(`/bookings/${encodeURIComponent(id)}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
                 'Accept': 'application/json'
             },
             body: JSON.stringify({ status: newStatus })
@@ -679,11 +677,10 @@ async updateReservationStatus(id, newStatus) {
             return;
         }
 
-        const emailResponse = await fetch('/confirm', {
+        const emailResponse = await window.tableStateApi.requestWithCsrf('/confirm', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
                 'Accept': 'application/json'
             },
             body: JSON.stringify({

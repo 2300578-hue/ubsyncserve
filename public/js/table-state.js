@@ -1,6 +1,25 @@
 window.tableStateApi = {
     inFlightLoad: null,
 
+    async requestWithCsrf(url, options = {}) {
+        const headers = new Headers(options.headers || {});
+        const sendRequest = (token) => {
+            const requestHeaders = new Headers(headers);
+            requestHeaders.set('X-CSRF-TOKEN', token || '');
+
+            return fetch(url, { ...options, headers: requestHeaders });
+        };
+        let token = document.querySelector('meta[name="csrf-token"]')?.content;
+        let response = await sendRequest(token);
+
+        if (response.status === 419) {
+            token = await this.refreshCsrfToken();
+            response = await sendRequest(token);
+        }
+
+        return response;
+    },
+
     async refreshCsrfToken() {
         const response = await fetch('/csrf', {
             headers: { 'Accept': 'application/json' },
