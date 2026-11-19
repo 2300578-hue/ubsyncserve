@@ -11,6 +11,13 @@ test('root loads the login page without redirecting', function () {
         ->assertViewIs('login.login');
 });
 
+test('csrf endpoint returns a fresh token without cacheable headers', function () {
+    $this->getJson(route('csrf-token'))
+        ->assertSuccessful()
+        ->assertJsonStructure(['token'])
+        ->assertHeader('Cache-Control', 'no-store, private');
+});
+
 test('invalid login credentials return a generic email and password message', function () {
     $this->postJson(route('login.post'), [
         'email' => 'unknown@example.com',

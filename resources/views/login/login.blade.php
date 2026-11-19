@@ -396,6 +396,47 @@
                     this.successMessage = '';
                 },
 
+                async postWithCsrf(url, payload) {
+                    const sendRequest = async () => {
+                        const tokenResponse = await fetch("{{ route('csrf-token') }}", {
+                            headers: { 'Accept': 'application/json' },
+                            cache: 'no-store',
+                            credentials: 'same-origin'
+                        });
+
+                        if (!tokenResponse.ok) {
+                            throw new Error('Unable to refresh your session. Reload the page and try again.');
+                        }
+
+                        const tokenData = await tokenResponse.json();
+                        if (typeof tokenData.token !== 'string' || tokenData.token.length === 0) {
+                            throw new Error('Unable to refresh your session. Reload the page and try again.');
+                        }
+
+                        return fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': tokenData.token
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify(payload)
+                        });
+                    };
+
+                    let response = await sendRequest();
+                    if (response.status === 419) {
+                        response = await sendRequest();
+                    }
+
+                    if (response.status === 419) {
+                        throw new Error('Your session expired. Reload the page and try again.');
+                    }
+
+                    return response;
+                },
+
                 async handleLogin() {
                     this.errorMessage = '';
 
@@ -407,24 +448,13 @@
                     this.isLoading = true;
 
                     try {
-                        const response = await fetch("{{ route('login.post') }}", {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: JSON.stringify({
-                                email: this.email,
-                                password: this.password
-                            })
+                        const response = await this.postWithCsrf("{{ route('login.post') }}", {
+                            email: this.email,
+                            password: this.password
                         });
 
                         const contentType = response.headers.get('content-type') || '';
                         const data = contentType.includes('application/json') ? await response.json() : {};
-                        if (response.status === 419) {
-                            throw new Error('Invalid email or password.');
-                        }
 
                         if (!response.ok) {
                             throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Invalid email or password.');
@@ -450,14 +480,8 @@
                     this.isLoading = true;
 
                     try {
-                        const response = await fetch("{{ route('password-reset.send-code') }}", {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: JSON.stringify({ email: this.email })
+                        const response = await this.postWithCsrf("{{ route('password-reset.send-code') }}", {
+                            email: this.email
                         });
 
                         const data = await response.json();
@@ -487,14 +511,9 @@
                     this.isLoading = true;
 
                     try {
-                        const response = await fetch("{{ route('password-reset.verify-code') }}", {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: JSON.stringify({ email: this.email, code: this.verificationCode })
+                        const response = await this.postWithCsrf("{{ route('password-reset.verify-code') }}", {
+                            email: this.email,
+                            code: this.verificationCode
                         });
 
                         const data = await response.json();
@@ -532,19 +551,11 @@
                     this.isLoading = true;
 
                     try {
-                        const response = await fetch("{{ route('password-reset.reset') }}", {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                            },
-                            body: JSON.stringify({
-                                email: this.email,
-                                reset_token: this.resetToken,
-                                password: this.newPassword,
-                                password_confirmation: this.confirmPassword
-                            })
+                        const response = await this.postWithCsrf("{{ route('password-reset.reset') }}", {
+                            email: this.email,
+                            reset_token: this.resetToken,
+                            password: this.newPassword,
+                            password_confirmation: this.confirmPassword
                         });
 
                         const data = await response.json();
