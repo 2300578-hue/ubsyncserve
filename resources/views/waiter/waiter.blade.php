@@ -70,7 +70,7 @@
                         <p class="text-xs font-bold text-slate-800 truncate">{{ Auth::user()->email ?? 'waiter@ub.edu.ph' }}</p>
                     </div>
                     <div class="px-2">
-                        <form action="{{ route('logout') }}" method="POST">
+                        <form action="{{ route('logout') }}" method="POST" data-refresh-csrf>
                             @csrf
                             <button type="submit" class="w-full text-left px-3 py-2.5 text-[11px] font-black text-red-600 rounded-lg uppercase tracking-widest flex items-center gap-3">
                                 <i class="fa-solid fa-power-off text-sm"></i> Sign Out

@@ -173,35 +173,48 @@ class TableStateController extends Controller
 
     public function clear(Request $request, int $tableNumber): JsonResponse
     {
-        $table = DB::table('restaurant_tables')
-            ->where('table_number', $tableNumber)
-            ->first();
+        return DB::transaction(function () use ($request, $tableNumber): JsonResponse {
+            $table = DB::table('restaurant_tables')
+                ->where('table_number', $tableNumber)
+                ->lockForUpdate()
+                ->first();
 
-        if ($table !== null && ($table->status === 'paid' || (bool) $table->is_paid)) {
-            abort_unless($request->user()?->role === 'manager', 403);
-        }
+            if ($table === null) {
+                return response()->json(['message' => 'Table not found.'], 404);
+            }
 
-        $updatedRows = DB::table('restaurant_tables')
-            ->where('table_number', $tableNumber)
-            ->update([
-                'status' => 'available',
-                'is_paid' => false,
-                'adults' => 0,
-                'children' => 0,
-                'guests' => 0,
-                'bill' => 0,
-                'orders' => json_encode([], JSON_THROW_ON_ERROR),
-                'start_time' => null,
-                'updated_at' => now(),
-            ]);
+            $isOccupied = $table->status === 'occupied';
+            $isPaid = $table->status === 'paid' || (bool) $table->is_paid;
 
-        if (
-            $updatedRows === 0
-            && ! DB::table('restaurant_tables')->where('table_number', $tableNumber)->exists()
-        ) {
-            return response()->json(['message' => 'Table not found.'], 404);
-        }
+            if ($isOccupied || $isPaid) {
+                abort_unless($request->user()?->role === 'manager', 403);
+            }
 
-        return response()->json(['success' => true]);
+            if (
+                $isOccupied
+                && DB::table('orders')
+                    ->where('table_number', (string) $tableNumber)
+                    ->where('status', 'pending')
+                    ->exists()
+            ) {
+                abort(409, 'Cannot clear this table while pending orders remain.');
+            }
+
+            DB::table('restaurant_tables')
+                ->where('table_number', $tableNumber)
+                ->update([
+                    'status' => 'available',
+                    'is_paid' => false,
+                    'adults' => 0,
+                    'children' => 0,
+                    'guests' => 0,
+                    'bill' => 0,
+                    'orders' => json_encode([], JSON_THROW_ON_ERROR),
+                    'start_time' => null,
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json(['success' => true]);
+        });
     }
 }

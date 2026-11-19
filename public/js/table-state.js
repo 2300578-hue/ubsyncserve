@@ -100,3 +100,33 @@ window.tableStateApi = {
         }
     }
 };
+
+document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute('data-refresh-csrf')) {
+        return;
+    }
+
+    event.preventDefault();
+    const submitButton = event.submitter;
+    if (submitButton instanceof HTMLButtonElement) {
+        submitButton.disabled = true;
+    }
+
+    try {
+        const token = await window.tableStateApi.refreshCsrfToken();
+        const tokenInput = form.querySelector('input[name="_token"]');
+        if (!(tokenInput instanceof HTMLInputElement)) {
+            throw new Error('Unable to prepare a secure sign-out request. Refresh the page and try again.');
+        }
+
+        tokenInput.value = token;
+        HTMLFormElement.prototype.submit.call(form);
+    } catch (error) {
+        if (submitButton instanceof HTMLButtonElement) {
+            submitButton.disabled = false;
+        }
+
+        alert(error.message || 'Unable to sign out securely. Refresh the page and try again.');
+    }
+});

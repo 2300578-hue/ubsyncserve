@@ -13,6 +13,16 @@ test('root loads the login page without redirecting', function () {
         ->assertViewIs('login.login');
 });
 
+test('authenticated manager can log out and is redirected to login', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    $this->actingAs($manager)
+        ->post(route('logout'))
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest();
+});
+
 test('invalid login credentials return a generic email and password message', function () {
     $this->postJson(route('login.post'), [
         'email' => 'unknown@example.com',

@@ -193,7 +193,15 @@
                             <span x-text="isClearingTable ? 'CLEARING...' : 'PAID - CLEAR TABLE'"></span>
                         </button>
                     </template>
-                    <template x-if="selectedTable?.status !== 'paid' && !selectedTable?.isPaid">
+                    <template x-if="selectedTable?.status === 'occupied' && !selectedTable?.isPaid">
+                        <button type="button" @click.prevent.stop="clearTable(selectedTable?.tableNumber || selectedTable?.id)"
+                            :disabled="isClearingTable"
+                            class="py-4 bg-amber-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+                            <i :class="isClearingTable ? 'fas fa-spinner fa-spin' : 'fas fa-broom'" class="text-sm"></i>
+                            <span x-text="isClearingTable ? 'CLEARING...' : 'CLEAR EMPTY TABLE'"></span>
+                        </button>
+                    </template>
+                    <template x-if="selectedTable?.status !== 'paid' && !selectedTable?.isPaid && selectedTable?.status !== 'occupied'">
                         <button class="py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-sm cursor-not-allowed flex items-center justify-center gap-2 opacity-60">
                             <i class="fas fa-clock text-sm"></i> Pending
                         </button>
