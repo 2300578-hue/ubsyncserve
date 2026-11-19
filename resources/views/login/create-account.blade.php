@@ -132,7 +132,7 @@
             <div class="account-field space-y-1.5">
                 <label for="role" class="block text-[11px] font-bold text-black-700 uppercase tracking-wider ml-1">Account Type</label>
                 <select id="role" x-model="role" required class="custom-input">
-                    <option value="waiter">Waiter</option>
+                    <option value="waiter">Staff</option>
                     <option value="manager">Manager</option>
                 </select>
             </div>
