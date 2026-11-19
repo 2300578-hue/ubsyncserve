@@ -45,7 +45,7 @@ test('it sends a six digit code to a registered email without exposing account e
     ])
         ->and(Hash::check($code, $challenge->token))->toBeTrue()
         ->and($challenge->is_used)->toBe(0)
-        ->and(Carbon::parse($challenge->expires_at)->diffInSeconds(Carbon::parse($challenge->created_at)))->toEqual(60);
+        ->and(Carbon::parse($challenge->created_at)->diffInSeconds(Carbon::parse($challenge->expires_at)))->toEqual(60);
 });
 
 test('it verifies the emailed code and resets the password once', function () {
