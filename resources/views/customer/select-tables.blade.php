@@ -22,13 +22,28 @@
             <div class="bg-maroon p-4 sm:p-6 md:p-8 text-center text-white relative overflow-hidden">
                 <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
                 <h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black uppercase tracking-widest relative z-10">Select Your Table</h1>
-                <p class="relative z-10 mt-1 sm:mt-2 text-xs sm:text-sm md:text-base text-white/80" x-text="currentReservation ? 'Complete your confirmed reservation' : (bookingType === 'advance-order' ? 'Choose a table for your advance order' : 'Choose a table for your table reservation')"></p>
+                <p class="relative z-10 mt-1 sm:mt-2 text-xs sm:text-sm md:text-base text-white/80" x-text="reservationError ? 'Reservation details could not be loaded' : (currentReservation ? 'Complete your confirmed reservation' : (bookingType === 'advance-order' ? 'Choose a table for your advance order' : 'Choose a table for your table reservation'))"></p>
             </div>
             <div class="p-4 sm:p-6 md:p-8">
                 <div class="flex flex-wrap gap-4 text-sm font-black">
                     <div class="flex items-center gap-2">
 
             </div>
+        </div>
+
+        <div x-show="reservationError || tableLoadError" x-cloak class="mb-4 space-y-2" role="alert">
+            <p x-show="reservationError" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700" x-text="reservationError"></p>
+            <div x-show="tableLoadError" class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                <span x-text="tableLoadError"></span>
+                <button type="button" @click="loadTables()" class="rounded-lg bg-red-700 px-3 py-2 text-xs font-bold text-white">Retry</button>
+            </div>
+        </div>
+
+        <div x-show="isLoadingTables && tables.length === 0" class="py-8 text-center text-sm font-semibold text-slate-500">
+            Loading tables…
+        </div>
+        <div x-show="!isLoadingTables && !tableLoadError && tables.length === 0" class="py-8 text-center text-sm font-semibold text-slate-500">
+            No tables were returned. Please retry.
         </div>
 
         <!-- Tables Grid -->
@@ -128,6 +143,10 @@
                 showDetailsModal: false,
                 selectedTable: null,
                 currentReservation: null,
+                reservationId: null,
+                reservationError: '',
+                tableLoadError: '',
+                isLoadingTables: false,
 
                 async init() {
                     const params = new URLSearchParams(window.location.search);
@@ -143,18 +162,14 @@
                         return;
                     }
 
-                    const resId = params.get('resId');
-                    if (resId) {
-                        const response = await fetch(`/booking/${encodeURIComponent(resId)}/table-details`, {
-                            headers: { 'Accept': 'application/json' }
-                        });
-                        if (!response.ok) {
-                            throw new Error('Unable to load confirmed reservation details.');
-                        }
-                        this.currentReservation = await response.json();
-                    }
-
                     await this.loadTables();
+                    this.reservationId = params.get('resId');
+                    if (this.reservationId) {
+                        const reservationLoaded = await this.loadReservationDetails();
+                        if (!reservationLoaded) {
+                            return;
+                        }
+                    }
 
                     let pendingSelection = null;
                     try {
@@ -188,9 +203,46 @@
                     }
                 },
 
+                async loadReservationDetails() {
+                    this.reservationError = '';
+
+                    try {
+                        const response = await fetch(`/booking/${encodeURIComponent(this.reservationId)}/table-details`, {
+                            headers: { 'Accept': 'application/json' },
+                            cache: 'no-store'
+                        });
+                        const result = await response.json().catch(() => ({}));
+
+                        if (!response.ok) {
+                            throw new Error(result.message || 'This reservation link is invalid or no longer active.');
+                        }
+
+                        this.currentReservation = result;
+                        return true;
+                    } catch (error) {
+                        this.currentReservation = null;
+                        this.reservationError = error.message || 'Unable to load reservation details. Please contact staff for a new link.';
+                        return false;
+                    }
+                },
+
                 async loadTables() {
-                    const tables = await window.tableStateApi.load();
-                    this.tables = tables;
+                    this.isLoadingTables = true;
+                    this.tableLoadError = '';
+
+                    try {
+                        const tables = await window.tableStateApi.load();
+                        if (!Array.isArray(tables)) {
+                            throw new Error('The server returned an invalid table list.');
+                        }
+
+                        this.tables = tables;
+                    } catch (error) {
+                        this.tables = [];
+                        this.tableLoadError = error.message || 'Unable to load tables. Please try again.';
+                    } finally {
+                        this.isLoadingTables = false;
+                    }
                 },
 
                 getTableClass(table) {
@@ -215,6 +267,11 @@
                 },
 
                 selectTable(table) {
+                    if (this.reservationId && !this.currentReservation) {
+                        alert('Reservation details are unavailable. Please contact staff for a valid selection link.');
+                        return;
+                    }
+
                     if (table.status === 'occupied') {
                         alert('This table is currently occupied.');
                         return;
