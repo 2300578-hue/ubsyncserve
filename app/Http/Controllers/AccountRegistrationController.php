@@ -24,6 +24,12 @@ class AccountRegistrationController extends Controller
             'password_confirmation' => ['required', 'string'],
         ]);
 
+        if ($validated['role'] === 'manager' && strcasecmp($validated['email'], (string) config('admin.email')) !== 0) {
+            return response()->json([
+                'message' => 'Manager registration is restricted to the configured admin email.',
+            ], 422);
+        }
+
         if (User::where('email', $validated['email'])->exists()) {
             return response()->json([
                 'message' => 'An account with this email already exists.',
