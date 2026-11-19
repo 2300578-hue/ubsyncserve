@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SalesShift;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -190,10 +191,15 @@ class TableStateController extends Controller
                 abort_unless($request->user()?->role === 'manager', 403);
             }
 
+            $openSalesShiftId = $isOccupied
+                ? SalesShift::query()->where('status', 'open')->value('id')
+                : null;
+
             if (
-                $isOccupied
+                $openSalesShiftId !== null
                 && DB::table('orders')
                     ->where('table_number', (string) $tableNumber)
+                    ->where('sales_shift_id', $openSalesShiftId)
                     ->where('status', 'pending')
                     ->exists()
             ) {

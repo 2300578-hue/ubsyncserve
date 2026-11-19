@@ -195,6 +195,51 @@ test('occupied table cannot be cleared while a database order is pending', funct
         ->assertJsonPath('0.status', 'occupied');
 });
 
+test('a pending order from a closed shift does not block clearing a stale occupied table', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+    $shift = SalesShift::query()->create([
+        'started_by' => $manager->id,
+        'business_date' => now()->subDay()->toDateString(),
+        'started_at' => now()->subDay(),
+        'ended_at' => now()->subDay()->addHours(8),
+        'status' => 'closed',
+    ]);
+
+    $order = Order::query()->create([
+        'order_number' => 'ORD-TABLE-2-STALE',
+        'table_number' => '2',
+        'sales_shift_id' => $shift->id,
+        'status' => 'pending',
+        'total_amount' => 150,
+        'subtotal_amount' => 150,
+        'discount_amount' => 0,
+        'vat_amount' => 0,
+    ]);
+
+    $this->actingAs($manager)->getJson(route('tables.index'))->assertSuccessful();
+    $this->putJson(route('tables.update'), [
+        'tables' => [
+            [
+                'id' => 2,
+                'status' => 'occupied',
+                'guests' => 1,
+                'orders' => [['name' => 'Stale dinner', 'qty' => 1, 'price' => 150]],
+            ],
+        ],
+    ])->assertSuccessful();
+
+    $this->postJson(route('tables.clear', ['tableNumber' => 2]))
+        ->assertSuccessful()
+        ->assertJsonPath('success', true);
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonPath('1.status', 'available')
+        ->assertJsonPath('1.orders', []);
+
+    expect($order->fresh()->status)->toBe('pending');
+});
+
 test('waiters cannot clear occupied tables', function () {
     $waiter = User::factory()->create(['role' => 'waiter']);
     $this->actingAs($waiter)->getJson(route('tables.index'))->assertSuccessful();
