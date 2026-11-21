@@ -150,8 +150,19 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button type="button" @click="editTableNumber(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-700 transition hover:border-[#800000] hover:text-[#800000] disabled:cursor-not-allowed disabled:opacity-40">Edit</button>
-                                <button type="button" @click="removeTable(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
+                                <template x-if="editingTableId === Number(table.id)">
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" min="1" step="1" x-model="tableNumberInput" @keydown.enter.prevent="saveTableNumber(table)" aria-label="New table number" class="w-24 rounded-lg border border-slate-300 px-2 py-2 text-sm font-bold text-slate-800 focus:border-[#800000] focus:outline-none">
+                                        <button type="button" @click.stop="saveTableNumber(table)" :disabled="isManagingTables" class="rounded-lg bg-[#800000] px-3 py-2 text-[10px] font-black uppercase text-white transition hover:bg-[#9a0000] disabled:cursor-wait disabled:opacity-60">Save</button>
+                                        <button type="button" @click.stop="cancelTableNumberEdit()" :disabled="isManagingTables" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-600 disabled:opacity-40">Cancel</button>
+                                    </div>
+                                </template>
+                                <template x-if="editingTableId !== Number(table.id)">
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" @click.prevent.stop="editTableNumber(table)" :disabled="isManagingTables" class="pointer-events-auto relative z-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-700 transition hover:border-[#800000] hover:text-[#800000] disabled:cursor-wait disabled:opacity-40">Edit</button>
+                                        <button type="button" @click.stop="removeTable(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </template>

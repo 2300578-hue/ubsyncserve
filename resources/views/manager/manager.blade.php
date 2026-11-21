@@ -252,6 +252,8 @@
                 showTableManagerModal: false,
                 tableManagementAlert: '',
                 tableManagementAlertTimer: null,
+                editingTableId: null,
+                tableNumberInput: '',
                 isRefreshingDashboard: false,
                 isClearingTable: false,
                 
@@ -741,13 +743,37 @@ async loadTablesFromStorage() {
                     }
                 },
 
-                async editTableNumber(table) {
-                    if (this.isManagingTables || !this.canManageTable(table)) {
+                editTableNumber(table) {
+                    if (this.isManagingTables) {
                         return;
                     }
 
-                    const tableNumber = window.prompt('Enter the new table number:', table.id);
-                    if (tableNumber === null || tableNumber.trim() === '') {
+                    if (!this.canManageTable(table)) {
+                        this.tableManagementError = 'This table cannot be edited until it is available and has no active orders or guests.';
+                        return;
+                    }
+
+                    this.tableManagementError = '';
+                    this.editingTableId = Number(table.id);
+                    this.tableNumberInput = String(table.tableNumber ?? table.id);
+                },
+
+                cancelTableNumberEdit() {
+                    this.editingTableId = null;
+                    this.tableNumberInput = '';
+                },
+
+                async saveTableNumber(table) {
+                    if (
+                        this.isManagingTables
+                        || this.editingTableId !== Number(table.id)
+                        || !this.canManageTable(table)
+                    ) {
+                        return;
+                    }
+
+                    const tableNumber = String(this.tableNumberInput).trim();
+                    if (tableNumber === '') {
                         return;
                     }
 
@@ -756,7 +782,8 @@ async loadTablesFromStorage() {
                     try {
                         const url = @json(route('manager.api.tables.update-number', ['tableNumber' => '__TABLE__']))
                             .replace('__TABLE__', encodeURIComponent(table.id));
-                        await this.tableManagementRequest(url, 'PUT', { table_number: tableNumber.trim() });
+                        await this.tableManagementRequest(url, 'PUT', { table_number: tableNumber });
+                        this.cancelTableNumberEdit();
                         await this.loadTablesFromStorage();
                     } catch (error) {
                         const duplicateTableNumber = error.status === 422
