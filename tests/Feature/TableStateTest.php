@@ -98,10 +98,74 @@ test('manager can add, renumber, and remove tables above the previous limit', fu
         ->assertSuccessful()
         ->assertJsonCount(15);
 
-    $this->assertDatabaseHas('restaurant_tables', [
+    $this->assertDatabaseMissing('restaurant_tables', [
         'table_number' => 20,
-        'is_active' => false,
     ]);
+});
+
+test('adding or removing a table keeps active table numbers consecutive', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    $this->actingAs($manager)
+        ->deleteJson(route('manager.api.tables.destroy', ['tableNumber' => 5]))
+        ->assertSuccessful();
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonCount(14)
+        ->assertJsonPath('4.id', 5)
+        ->assertJsonPath('13.id', 14);
+
+    $this->postJson(route('manager.api.tables.store'))
+        ->assertCreated()
+        ->assertJsonPath('id', 15);
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonCount(15)
+        ->assertJsonPath('14.id', 15);
+});
+
+test('removing a table renumbers the floorplan and its open shift pending orders', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+    $shift = SalesShift::query()->create([
+        'started_by' => $manager->id,
+        'business_date' => now()->toDateString(),
+        'started_at' => now(),
+        'status' => 'open',
+    ]);
+    Order::query()->create([
+        'order_number' => 'ORD-TABLE-15-RENUMBER',
+        'table_number' => '15',
+        'sales_shift_id' => $shift->id,
+        'status' => 'pending',
+        'total_amount' => 150,
+        'subtotal_amount' => 150,
+        'discount_amount' => 0,
+        'vat_amount' => 0,
+    ]);
+
+    DB::table('restaurant_tables')
+        ->where('table_number', 15)
+        ->update([
+            'status' => 'occupied',
+            'guests' => 1,
+        ]);
+
+    $this->actingAs($manager)
+        ->deleteJson(route('manager.api.tables.destroy', ['tableNumber' => 2]))
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('orders', [
+        'order_number' => 'ORD-TABLE-15-RENUMBER',
+        'table_number' => '14',
+    ]);
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonCount(14)
+        ->assertJsonPath('13.id', 14)
+        ->assertJsonPath('13.status', 'occupied');
 });
 
 test('manager cannot edit a table to a number that already exists', function () {

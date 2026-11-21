@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PrintJob;
 use App\Models\SalesShift;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -217,11 +219,10 @@ class TableStateController extends Controller
     public function store(): JsonResponse
     {
         $tableNumber = DB::transaction(function (): int {
-            $lastTable = DB::table('restaurant_tables')
-                ->orderByDesc('table_number')
-                ->lockForUpdate()
-                ->first(['table_number']);
-            $tableNumber = ((int) ($lastTable->table_number ?? 0)) + 1;
+            $this->normalizeActiveTableNumbers();
+            $tableNumber = (int) DB::table('restaurant_tables')
+                ->where('is_active', true)
+                ->count() + 1;
 
             DB::table('restaurant_tables')->insert([
                 'table_number' => $tableNumber,
@@ -305,13 +306,111 @@ class TableStateController extends Controller
 
             DB::table('restaurant_tables')
                 ->where('id', $table->id)
-                ->update([
-                    'is_active' => false,
-                    'updated_at' => now(),
-                ]);
+                ->delete();
+
+            $this->normalizeActiveTableNumbers();
 
             return response()->json(['success' => true]);
         });
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function normalizeActiveTableNumbers(): array
+    {
+        DB::table('restaurant_tables')->where('is_active', false)->delete();
+
+        $tables = DB::table('restaurant_tables')
+            ->where('is_active', true)
+            ->orderBy('table_number')
+            ->lockForUpdate()
+            ->get(['id', 'table_number']);
+
+        if ($tables->isEmpty()) {
+            return [];
+        }
+
+        $temporaryNumber = (int) $tables->max('table_number') + $tables->count() + 1;
+        foreach ($tables as $index => $table) {
+            DB::table('restaurant_tables')
+                ->where('id', $table->id)
+                ->update(['table_number' => $temporaryNumber + $index]);
+        }
+
+        $numberMap = [];
+        foreach ($tables as $index => $table) {
+            $newNumber = $index + 1;
+            $numberMap[(int) $table->table_number] = $newNumber;
+
+            DB::table('restaurant_tables')
+                ->where('id', $table->id)
+                ->update([
+                    'table_number' => $newNumber,
+                    'updated_at' => now(),
+                ]);
+        }
+
+        $this->updateOpenShiftTableReferences($numberMap);
+
+        return $numberMap;
+    }
+
+    /**
+     * @param  array<int, int>  $numberMap
+     */
+    private function updateOpenShiftTableReferences(array $numberMap): void
+    {
+        if ($numberMap === []) {
+            return;
+        }
+
+        $openSalesShiftId = SalesShift::query()
+            ->where('status', 'open')
+            ->value('id');
+
+        if ($openSalesShiftId === null) {
+            return;
+        }
+
+        $orders = DB::table('orders')
+            ->where('sales_shift_id', $openSalesShiftId)
+            ->where('status', 'pending')
+            ->get(['id', 'table_number']);
+
+        foreach ($orders as $order) {
+            $oldNumber = (int) $order->table_number;
+            $newNumber = $numberMap[$oldNumber] ?? $oldNumber;
+            if ($newNumber !== $oldNumber) {
+                DB::table('orders')
+                    ->where('id', $order->id)
+                    ->update(['table_number' => (string) $newNumber]);
+            }
+        }
+
+        if (! Schema::hasTable('print_jobs')) {
+            return;
+        }
+
+        PrintJob::query()
+            ->where('status', 'pending')
+            ->get()
+            ->each(function (PrintJob $printJob) use ($numberMap, $openSalesShiftId): void {
+                $payload = $printJob->payload ?? [];
+                if (
+                    (int) ($payload['sales_shift_id'] ?? 0) !== (int) $openSalesShiftId
+                    || ! isset($payload['table_number'])
+                ) {
+                    return;
+                }
+
+                $oldNumber = (int) $payload['table_number'];
+                $newNumber = $numberMap[$oldNumber] ?? $oldNumber;
+                if ($newNumber !== $oldNumber) {
+                    $payload['table_number'] = (string) $newNumber;
+                    $printJob->update(['payload' => $payload]);
+                }
+            });
     }
 
     private function ensureTableCanBeManaged(object $table): void

@@ -121,8 +121,8 @@
 </div>
 
     <div x-show="tableManagementAlert" x-cloak x-transition role="alert" aria-live="assertive" class="fixed right-4 top-4 z-[1600] rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-xl" x-text="tableManagementAlert"></div>
-    <div x-show="showTableManagerModal" x-cloak @click.self="showTableManagerModal = false" class="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-        <div @click.stop class="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-white shadow-2xl">
+    <div x-show="showTableManagerModal" x-cloak @click.self="showTableManagerModal = false" class="fixed inset-0 z-[1500] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
+        <div @click.stop class="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-white/20 bg-white shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                 <div>
                     <h2 class="text-xl font-black uppercase tracking-tight text-slate-800">Manage Tables</h2>
@@ -133,7 +133,7 @@
                 </button>
             </div>
 
-            <div class="max-h-[55vh] overflow-y-auto p-6">
+            <div class="min-h-0 flex-1 overflow-y-auto p-6">
                 <p x-show="tableManagementError" x-cloak role="alert" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" x-text="tableManagementError"></p>
                 <div x-show="openTables.length === 0" class="rounded-xl border border-dashed border-slate-300 py-10 text-center text-sm font-bold text-slate-400">No tables configured.</div>
                 <div class="space-y-3">
