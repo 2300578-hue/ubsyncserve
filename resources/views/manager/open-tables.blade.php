@@ -12,7 +12,7 @@
                 <i class="fas fa-plus"></i>
                 <span x-text="isManagingTables ? 'Please wait…' : 'Add Table'"></span>
             </button>
-            <button type="button" @click="showTableManagerModal = true" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-700 shadow-sm transition hover:border-[#800000] hover:text-[#800000]">
+            <button type="button" @click.prevent.stop="openTableManager()" class="relative z-10 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-xs font-black uppercase tracking-wide text-slate-700 shadow-sm transition hover:border-[#800000] hover:text-[#800000]">
                 <i class="fas fa-sliders"></i>
                 Edit
             </button>
@@ -120,10 +120,9 @@
 </template>
 </div>
 
-<template x-teleport="body">
     <div x-show="tableManagementAlert" x-cloak x-transition role="alert" aria-live="assertive" class="fixed right-4 top-4 z-[1600] rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-xl" x-text="tableManagementAlert"></div>
-    <div x-show="showTableManagerModal" x-cloak class="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-        <div @click.outside="showTableManagerModal = false" class="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-white shadow-2xl">
+    <div x-show="showTableManagerModal" x-cloak @click.self="showTableManagerModal = false" class="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div @click.stop class="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-white shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                 <div>
                     <h2 class="text-xl font-black uppercase tracking-tight text-slate-800">Manage Tables</h2>
@@ -170,8 +169,6 @@
             </div>
         </div>
     </div>
-</template>
-
    <!-- ================= ORDER / BILL MODAL ================= -->
 <template x-teleport="body">
     <div x-show="showOrderModal" x-cloak 

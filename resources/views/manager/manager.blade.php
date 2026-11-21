@@ -722,6 +722,13 @@ async loadTablesFromStorage() {
                     }, 1000);
                 },
 
+                openTableManager() {
+                    this.tableManagementError = '';
+                    this.editingTableId = null;
+                    this.tableNumberInput = '';
+                    this.showTableManagerModal = true;
+                },
+
                 async addTable() {
                     if (this.isManagingTables) {
                         return;
