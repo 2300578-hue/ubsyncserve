@@ -51,7 +51,7 @@
                                     class="px-4 py-2 bg-[#800000] text-white rounded-lg font-bold text-xs disabled:opacity-50">
                                     <span x-text="savingIngredientId === ingredient.id ? 'Saving...' : 'Save Stock'"></span>
                                 </button>
-                                <button type="button" @click="removeIngredient(ingredient)"
+                                <button type="button" @click="removeSharedIngredient(ingredient)"
                                     :disabled="savingIngredientId === ingredient.id"
                                     class="px-4 py-2 rounded-lg border border-red-200 bg-white text-red-700 font-bold text-xs transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-50">
                                     <span x-text="savingIngredientId === ingredient.id ? 'Please wait...' : 'Remove'"></span>
