@@ -249,6 +249,7 @@
                 tableSyncError: '',
                    tableManagementError: '',
                    isManagingTables: false,
+                showTableManagerModal: false,
                 isRefreshingDashboard: false,
                 isClearingTable: false,
                 
