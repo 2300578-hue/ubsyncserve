@@ -101,14 +101,9 @@
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center">
                     <div class="text-xs text-blue-700">
                         <i class="fas fa-info-circle"></i>
-                        <p class="font-bold">Sellable stock decreases automatically after each waiter order</p>
+                        <p class="font-bold">Product stock is calculated from the ingredient quantities below</p>
                     </div>
                 </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-black text-slate-700 uppercase mb-2">Available Stock</label>
-                <input type="number" min="0" step="1" x-model.number="formData.stock" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -153,7 +148,7 @@
                                 </div>
                                 <div class="col-span-5">
                                     <label class="text-xs font-bold text-slate-600 block mb-1">Current Stock</label>
-                                    <input type="number" x-model.number="ingredient.stock" placeholder="0" min="0" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none text-sm">
+                                    <input type="number" x-model.number="ingredient.stock" placeholder="0" min="0" step="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none text-sm">
                                 </div>
                                 <button type="button" @click="removeIngredient(idx)" class="col-span-12 px-3 py-2 bg-red-100 text-red-700 rounded-lg font-bold text-xs hover:bg-red-200 mt-2">Remove</button>
                             </div>

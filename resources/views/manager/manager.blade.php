@@ -251,7 +251,7 @@
                 isClearingTable: false,
                 
                 // Inventory Data
-                formData: { id: null, name: '', cost: 0, sellingPrice: 0, stock: 0, img: '', addOns: [], ingredients: [] },
+                formData: { id: null, name: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] },
                 products: [],
 
                 normalizeProducts(products) {
@@ -300,7 +300,7 @@
                 },
 
                 resetForm() {
-                    this.formData = { id: null, name: '', cost: 0, sellingPrice: 0, stock: 0, img: '', addOns: [], ingredients: [] };
+                    this.formData = { id: null, name: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] };
                 },
 
                 formatCurrency(val) {
@@ -971,7 +971,11 @@ async clearTable(tableId) {
                     this.showAddModal = false;
                     this.editingProductId = product.id;
                     this.formData = {
-                        ...product,
+                        id: product.id,
+                        name: product.name,
+                        cost: product.cost,
+                        sellingPrice: product.sellingPrice,
+                        img: product.img,
                         addOns: (product.addOns || []).map(addOn => ({ ...addOn })),
                         ingredients: (product.ingredients || []).map(ingredient => ({ ...ingredient }))
                     };
@@ -1084,7 +1088,7 @@ async clearTable(tableId) {
                 },
 
                 resetForm() {
-                    this.formData = { id: null, name: '', cost: 0, sellingPrice: 0, stock: 0, img: '', addOns: [], ingredients: [] };
+                    this.formData = { id: null, name: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] };
                 },
 
 async init() {

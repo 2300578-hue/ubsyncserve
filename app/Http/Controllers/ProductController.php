@@ -337,14 +337,14 @@ class ProductController extends Controller
             'cost' => ['nullable', 'numeric', 'min:0'],
             'sellingPrice' => ['required', 'numeric', 'min:0'],
             'img' => ['nullable', 'string'],
-            'stock' => ['nullable', 'integer', 'min:0'],
             'addOns' => ['nullable', 'array'],
             'addOns.*.name' => ['nullable', 'string', 'max:255'],
             'addOns.*.price' => ['nullable', 'numeric', 'min:0'],
             'ingredients' => ['nullable', 'array'],
             'ingredients.*.name' => ['required_with:ingredients.*.stock', 'string', 'max:255'],
-            'ingredients.*.stock' => ['required', 'numeric', 'min:0'],
+            'ingredients.*.stock' => ['required', 'integer', 'min:0'],
         ]);
+        $ingredients = $validated['ingredients'] ?? [];
 
         return [
             'name' => $validated['name'],
@@ -352,9 +352,9 @@ class ProductController extends Controller
             'cost_price' => $validated['cost'] ?? 0,
             'selling_price' => $validated['sellingPrice'],
             'image' => $validated['img'] ?? null,
-            'stock_quantity' => $validated['stock'] ?? 0,
+            'stock_quantity' => array_sum(array_column($ingredients, 'stock')),
             'add_ons' => $validated['addOns'] ?? [],
-            'ingredients' => $validated['ingredients'] ?? [],
+            'ingredients' => $ingredients,
         ];
     }
 }

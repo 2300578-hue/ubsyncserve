@@ -10,10 +10,12 @@ test('a manager can create and edit an inventory product', function () {
         'category' => 'Meals',
         'cost' => 50,
         'sellingPrice' => 85,
-        'stock' => 12,
         'img' => '',
         'addOns' => [['name' => 'Extra rice', 'price' => 15]],
-        'ingredients' => [['name' => 'Rice', 'stock' => 0]],
+        'ingredients' => [
+            ['name' => 'Rice', 'stock' => 10],
+            ['name' => 'Chicken', 'stock' => 2],
+        ],
     ];
 
     $createdProduct = $this->postJson(route('products.store'), $productData)
@@ -26,7 +28,10 @@ test('a manager can create and edit an inventory product', function () {
         ...$productData,
         'name' => 'Chicken Rice Special',
         'sellingPrice' => 99,
-        'stock' => 18,
+        'ingredients' => [
+            ['name' => 'Rice', 'stock' => 15],
+            ['name' => 'Chicken', 'stock' => 3],
+        ],
     ];
 
     $this->putJson(route('products.update', $createdProduct['id']), $updatedProductData)
