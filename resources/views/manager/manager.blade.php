@@ -250,6 +250,8 @@
                    tableManagementError: '',
                    isManagingTables: false,
                 showTableManagerModal: false,
+                tableManagementAlert: '',
+                tableManagementAlertTimer: null,
                 isRefreshingDashboard: false,
                 isClearingTable: false,
                 
@@ -697,10 +699,25 @@ async loadTablesFromStorage() {
 
                     if (!response.ok) {
                         const validationMessage = Object.values(payload.errors || {}).flat()[0];
-                        throw new Error(payload.message || validationMessage || 'Unable to update tables.');
+                        const error = new Error(payload.message || validationMessage || 'Unable to update tables.');
+                        error.status = response.status;
+                        error.validationErrors = payload.errors || {};
+                        throw error;
                     }
 
                     return payload;
+                },
+
+                showTableManagementAlert(message) {
+                    if (this.tableManagementAlertTimer !== null) {
+                        window.clearTimeout(this.tableManagementAlertTimer);
+                    }
+
+                    this.tableManagementAlert = message;
+                    this.tableManagementAlertTimer = window.setTimeout(() => {
+                        this.tableManagementAlert = '';
+                        this.tableManagementAlertTimer = null;
+                    }, 1000);
                 },
 
                 async addTable() {
@@ -742,7 +759,15 @@ async loadTablesFromStorage() {
                         await this.tableManagementRequest(url, 'PUT', { table_number: tableNumber.trim() });
                         await this.loadTablesFromStorage();
                     } catch (error) {
-                        this.tableManagementError = error.message || 'Unable to edit this table.';
+                        const duplicateTableNumber = error.status === 422
+                            && (error.validationErrors?.table_number || [])
+                                .some(message => /already|taken/i.test(message));
+
+                        if (duplicateTableNumber) {
+                            this.showTableManagementAlert('That table number is already in use.');
+                        } else {
+                            this.tableManagementError = error.message || 'Unable to edit this table.';
+                        }
                     } finally {
                         this.isManagingTables = false;
                     }

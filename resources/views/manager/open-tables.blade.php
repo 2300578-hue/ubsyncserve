@@ -121,6 +121,7 @@
 </div>
 
 <template x-teleport="body">
+    <div x-show="tableManagementAlert" x-cloak x-transition role="alert" aria-live="assertive" class="fixed right-4 top-4 z-[1600] rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-xl" x-text="tableManagementAlert"></div>
     <div x-show="showTableManagerModal" x-cloak class="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
         <div @click.outside="showTableManagerModal = false" class="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-white shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
@@ -149,6 +150,7 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
+                                <button type="button" @click="editTableNumber(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-700 transition hover:border-[#800000] hover:text-[#800000] disabled:cursor-not-allowed disabled:opacity-40">Edit</button>
                                 <button type="button" @click="removeTable(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
                             </div>
                         </div>

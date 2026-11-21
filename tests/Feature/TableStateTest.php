@@ -104,6 +104,22 @@ test('manager can add, renumber, and remove tables above the previous limit', fu
     ]);
 });
 
+test('manager cannot edit a table to a number that already exists', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    $this->actingAs($manager)
+        ->putJson(route('manager.api.tables.update-number', ['tableNumber' => 1]), [
+            'table_number' => 2,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('table_number');
+
+    $this->assertDatabaseHas('restaurant_tables', [
+        'table_number' => 1,
+        'is_active' => true,
+    ]);
+});
+
 test('manager cannot edit or remove a table with an active reservation or order', function () {
     $manager = User::factory()->create(['role' => 'manager']);
     $this->actingAs($manager);
