@@ -133,15 +133,8 @@
                 </button>
             </div>
 
-            <div class="border-b border-slate-100 px-6 py-4">
-                <button type="button" @click="addTable()" :disabled="isManagingTables" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#800000] px-5 py-3 text-xs font-black uppercase tracking-wide text-white shadow-md transition hover:bg-[#9a0000] disabled:cursor-wait disabled:opacity-60">
-                    <i class="fas fa-plus"></i>
-                    <span x-text="isManagingTables ? 'Please wait…' : 'Add Table'"></span>
-                </button>
-                <p x-show="tableManagementError" x-cloak class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" x-text="tableManagementError"></p>
-            </div>
-
             <div class="max-h-[55vh] overflow-y-auto p-6">
+                <p x-show="tableManagementError" x-cloak role="alert" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" x-text="tableManagementError"></p>
                 <div x-show="openTables.length === 0" class="rounded-xl border border-dashed border-slate-300 py-10 text-center text-sm font-bold text-slate-400">No tables configured.</div>
                 <div class="space-y-3">
                     <template x-for="table in openTables" :key="table.id">
