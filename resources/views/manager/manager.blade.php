@@ -168,6 +168,56 @@
 
     </main>
 
+    <div x-show="tableManagementAlert" x-cloak x-transition role="alert" aria-live="assertive" class="fixed right-4 top-4 z-[2100] rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-xl" x-text="tableManagementAlert"></div>
+    <div x-show="showTableManagerModal" x-cloak @click.self="showTableManagerModal = false" class="fixed inset-0 z-[2000] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm sm:items-center">
+        <div @click.stop class="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-white/20 bg-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                <div>
+                    <h2 class="text-xl font-black uppercase tracking-tight text-slate-800">Manage Tables</h2>
+                    <p class="mt-1 text-xs font-semibold text-slate-400">Add, renumber, or remove available tables.</p>
+                </div>
+                <button type="button" @click="showTableManagerModal = false" aria-label="Close table manager" class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-y-auto p-6">
+                <p x-show="tableManagementError" x-cloak role="alert" class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700" x-text="tableManagementError"></p>
+                <div x-show="openTables.length === 0" class="rounded-xl border border-dashed border-slate-300 py-10 text-center text-sm font-bold text-slate-400">No tables configured.</div>
+                <div class="space-y-3">
+                    <template x-for="table in openTables" :key="table.id">
+                        <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div class="flex items-center gap-3">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sm font-black text-slate-700 shadow-sm" x-text="table.tableNumber"></div>
+                                <div>
+                                    <p class="text-sm font-black text-slate-800" x-text="'Table ' + table.tableNumber"></p>
+                                    <p class="mt-0.5 text-[10px] font-bold uppercase tracking-wider"
+                                       :class="canManageTable(table) ? 'text-emerald-600' : 'text-amber-600'"
+                                       x-text="canManageTable(table) ? 'Available' : 'Currently in use'"></p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <template x-if="editingTableId === Number(table.id)">
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" min="1" step="1" x-model="tableNumberInput" @keydown.enter.prevent="saveTableNumber(table)" aria-label="New table number" class="w-24 rounded-lg border border-slate-300 px-2 py-2 text-sm font-bold text-slate-800 focus:border-[#800000] focus:outline-none">
+                                        <button type="button" @click.stop="saveTableNumber(table)" :disabled="isManagingTables" class="rounded-lg bg-[#800000] px-3 py-2 text-[10px] font-black uppercase text-white transition hover:bg-[#9a0000] disabled:cursor-wait disabled:opacity-60">Save</button>
+                                        <button type="button" @click.stop="cancelTableNumberEdit()" :disabled="isManagingTables" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-600 disabled:opacity-40">Cancel</button>
+                                    </div>
+                                </template>
+                                <template x-if="editingTableId !== Number(table.id)">
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" @click="editTableNumber(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-700 transition hover:border-[#800000] hover:text-[#800000] disabled:cursor-not-allowed disabled:opacity-40">Edit</button>
+                                        <button type="button" @click="removeTable(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div x-show="reservationToast" x-cloak role="status" aria-live="polite" class="fixed right-4 top-20 z-[2100] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl">
         <div class="flex items-start gap-3">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -720,13 +770,6 @@ async loadTablesFromStorage() {
                         this.tableManagementAlert = '';
                         this.tableManagementAlertTimer = null;
                     }, 1000);
-                },
-
-                openTableManager() {
-                    this.tableManagementError = '';
-                    this.editingTableId = null;
-                    this.tableNumberInput = '';
-                    this.showTableManagerModal = true;
                 },
 
                 async addTable() {
