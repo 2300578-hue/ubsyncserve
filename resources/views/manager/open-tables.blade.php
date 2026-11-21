@@ -149,7 +149,6 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button type="button" @click="editTableNumber(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[10px] font-black uppercase text-slate-700 transition hover:border-[#800000] hover:text-[#800000] disabled:cursor-not-allowed disabled:opacity-40">Edit</button>
                                 <button type="button" @click="removeTable(table)" :disabled="isManagingTables || !canManageTable(table)" class="rounded-lg border border-red-200 bg-white px-3 py-2 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
                             </div>
                         </div>

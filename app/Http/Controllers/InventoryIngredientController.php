@@ -54,4 +54,32 @@ class InventoryIngredientController extends Controller
             'stock' => $ingredient->stock_quantity,
         ]);
     }
+
+    public function destroy(InventoryIngredient $ingredient): JsonResponse
+    {
+        DB::transaction(function () use ($ingredient): void {
+            $productIds = $ingredient->products()
+                ->orderBy('products.id')
+                ->pluck('products.id')
+                ->all();
+            $products = Product::query()
+                ->whereKey($productIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $ingredient = InventoryIngredient::query()
+                ->lockForUpdate()
+                ->findOrFail($ingredient->id);
+
+            $ingredient->products()->detach();
+            $ingredient->delete();
+
+            $products->each(static function (Product $product): void {
+                $product->unsetRelation('ingredients');
+                $product->refreshStockQuantity();
+            });
+        });
+
+        return response()->json(['success' => true]);
+    }
 }

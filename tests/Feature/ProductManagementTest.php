@@ -101,3 +101,36 @@ test('products share ingredients and central restocking updates every linked pro
 
     $this->assertDatabaseCount('ingredients', 3);
 });
+
+test('a manager can remove a shared ingredient from every linked product', function () {
+    $product = $this->postJson(route('products.store'), [
+        'name' => 'Tapsilog',
+        'sellingPrice' => 100,
+        'ingredients' => [
+            ['name' => 'Egg', 'stock' => 10],
+        ],
+    ])->assertCreated()->json();
+    $ingredientId = $product['ingredients'][0]['id'];
+
+    $this->postJson(route('products.store'), [
+        'name' => 'Hatsilog',
+        'sellingPrice' => 90,
+        'ingredients' => [
+            ['name' => 'Egg', 'stock' => 5],
+        ],
+    ])->assertCreated();
+
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    $this->actingAs($manager)
+        ->deleteJson(route('manager.api.ingredients.destroy', $ingredientId))
+        ->assertSuccessful()
+        ->assertJsonPath('success', true);
+
+    $this->assertDatabaseMissing('ingredients', ['id' => $ingredientId]);
+    $this->assertDatabaseMissing('ingredient_product', ['ingredient_id' => $ingredientId]);
+
+    $catalog = collect($this->getJson(route('products.index'))->json());
+    expect($catalog->firstWhere('id', $product['id'])['ingredients'])->toBe([])
+        ->and($catalog->firstWhere('id', $product['id'])['stock'])->toBe(0);
+});

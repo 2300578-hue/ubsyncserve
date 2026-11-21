@@ -47,6 +47,8 @@ Route::middleware(['auth', 'manager'])->name('manager.api.')->group(function () 
     Route::get('/ingredients', [InventoryIngredientController::class, 'index'])->name('ingredients.index');
     Route::put('/ingredients/{ingredient}', [InventoryIngredientController::class, 'update'])
         ->name('ingredients.update');
+    Route::delete('/ingredients/{ingredient}', [InventoryIngredientController::class, 'destroy'])
+        ->name('ingredients.destroy');
     Route::get('/shift', [SalesShiftController::class, 'show'])->name('sales-shift.show');
     Route::get('/shift/export', [SalesShiftController::class, 'export'])->name('sales-shift.export');
     Route::post('/shift/start', [SalesShiftController::class, 'start'])->name('sales-shift.start');

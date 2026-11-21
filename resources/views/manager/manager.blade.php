@@ -335,6 +335,37 @@
                     }
                 },
 
+                async removeIngredient(ingredient) {
+                    if (
+                        this.savingIngredientId !== null
+                        || !window.confirm(`Remove ${ingredient.name} from shared ingredients and unlink it from every product that uses it?`)
+                    ) {
+                        return;
+                    }
+
+                    this.savingIngredientId = ingredient.id;
+
+                    try {
+                        const response = await fetch(`{{ route('manager.api.ingredients.index') }}/${ingredient.id}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            }
+                        });
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(result.message || 'Unable to remove shared ingredient.');
+                        }
+
+                        await Promise.all([this.loadIngredients(), this.loadProducts()]);
+                    } catch (error) {
+                        alert(error.message || 'Unable to remove shared ingredient.');
+                    } finally {
+                        this.savingIngredientId = null;
+                    }
+                },
+
                 async saveProductToDatabase(product) {
                     const isEditing = product.id !== null && product.id !== undefined;
                     const url = isEditing
