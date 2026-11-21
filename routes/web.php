@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountRegistrationController;
 use App\Http\Controllers\CustomerBookingController;
+use App\Http\Controllers\InventoryIngredientController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PrintBridgeController;
 use App\Http\Controllers\ProductController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\SalesShiftController;
 use App\Http\Controllers\TableStateController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'manager'])->group(function () {
@@ -35,6 +37,16 @@ Route::middleware(['auth', 'manager'])->group(function () {
 });
 
 Route::middleware(['auth', 'manager'])->name('manager.api.')->group(function () {
+    Route::post('/manager/tables', [TableStateController::class, 'store'])->name('tables.store');
+    Route::put('/manager/tables/{tableNumber}', [TableStateController::class, 'updateNumber'])
+        ->whereNumber('tableNumber')
+        ->name('tables.update-number');
+    Route::delete('/manager/tables/{tableNumber}', [TableStateController::class, 'destroy'])
+        ->whereNumber('tableNumber')
+        ->name('tables.destroy');
+    Route::get('/ingredients', [InventoryIngredientController::class, 'index'])->name('ingredients.index');
+    Route::put('/ingredients/{ingredient}', [InventoryIngredientController::class, 'update'])
+        ->name('ingredients.update');
     Route::get('/shift', [SalesShiftController::class, 'show'])->name('sales-shift.show');
     Route::get('/shift/export', [SalesShiftController::class, 'export'])->name('sales-shift.export');
     Route::post('/shift/start', [SalesShiftController::class, 'start'])->name('sales-shift.start');
@@ -110,16 +122,26 @@ Route::get('/qr', function () {
 
 Route::get('/qr/{table}', function (string $table) {
     $tableNumber = intval($table);
-    if ($tableNumber < 1 || $tableNumber > 15) {
+    if ($tableNumber < 1 || ! DB::table('restaurant_tables')
+        ->where('table_number', $tableNumber)
+        ->where('is_active', true)
+        ->exists()) {
         abort(404);
     }
 
     return redirect()->route('order.select-booking');
-})->where('table', '[1-9]|1[0-5]')->name('order.qrcodes.single');
+})->whereNumber('table')->name('order.qrcodes.single');
 
 Route::get('/select/{table?}', function (?int $table = null) {
+    if ($table !== null && ! DB::table('restaurant_tables')
+        ->where('table_number', $table)
+        ->where('is_active', true)
+        ->exists()) {
+        abort(404);
+    }
+
     return view('customer.select-tables', ['table' => $table]);
-})->where('table', '[1-9]|1[0-5]')->name('order.select-tables');
+})->whereNumber('table')->name('order.select-tables');
 
 Route::get('/reserve', function () {
     return view('customer.booking-choice');
@@ -131,12 +153,15 @@ Route::get('/choice', function () {
 
 Route::get('/setup/{table}', function (string $table) {
     $tableNumber = intval($table);
-    if ($tableNumber < 1 || $tableNumber > 15) {
+    if ($tableNumber < 1 || ! DB::table('restaurant_tables')
+        ->where('table_number', $tableNumber)
+        ->where('is_active', true)
+        ->exists()) {
         abort(404);
     }
 
     return redirect()->route('order.menu', ['table' => $tableNumber]);
-})->where('table', '[1-9]|1[0-5]')->name('order.setup');
+})->whereNumber('table')->name('order.setup');
 
 Route::get('/menu', function () {
     return view('customer.customer-menu');

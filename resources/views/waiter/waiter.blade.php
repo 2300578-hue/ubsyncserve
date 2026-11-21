@@ -215,6 +215,10 @@
                     </div>
                 </template>
             </div>
+            <div x-show="tables.length === 0" class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+                <p class="text-sm font-bold text-slate-600">No tables are available yet.</p>
+                <p class="mt-1 text-xs text-slate-400">Ask the manager to add tables for this venue.</p>
+            </div>
 
         </div>
 
@@ -816,11 +820,13 @@ function waiterSystem() {
                 const legacyTables = localStorage.getItem('ub_tables');
                 if (legacyTables) {
                     const legacy = JSON.parse(legacyTables);
+                    const activeTableIds = new Set(parsedTables.map(table => Number(table.id)));
                     const hasServerState = parsedTables.some(table =>
                         table.status !== 'available' || table.orders.length > 0
                     );
                     const legacyActiveTables = legacy.filter(table =>
-                        table.status !== 'available' || (table.orders && table.orders.length > 0)
+                        activeTableIds.has(Number(table.id))
+                        && (table.status !== 'available' || (table.orders && table.orders.length > 0))
                     ).map(table => ({
                         ...table,
                         status: ['occupied', 'paid', 'reserved-advance', 'reserved-booking'].includes(table.status)

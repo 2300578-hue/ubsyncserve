@@ -7,9 +7,14 @@
                 Real-time Table Occupancy Status
             </p>
         </div>
+        <button type="button" @click="addTable()" :disabled="isManagingTables" class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#800000] px-5 py-3 text-xs font-black uppercase tracking-wide text-white shadow-md transition hover:bg-[#9a0000] disabled:cursor-wait disabled:opacity-60">
+            <i class="fas fa-plus"></i>
+            <span x-text="isManagingTables ? 'Please wait…' : 'Add Table'"></span>
+        </button>
     </div>
 
     <div x-show="tableSyncError" x-cloak class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700" x-text="tableSyncError"></div>
+    <div x-show="tableManagementError" x-cloak role="alert" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700" x-text="tableManagementError"></div>
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <!-- Available Tables Card -->
@@ -55,8 +60,13 @@
         </div>
     </div>
 
-   <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-  <template x-for="(table, index) in openTables" :key="index">
+    <div x-show="openTables.length === 0" class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+        <p class="text-sm font-bold text-slate-600">No tables configured yet.</p>
+        <p class="mt-1 text-xs text-slate-400">Add tables to match your venue.</p>
+    </div>
+
+   <div x-show="openTables.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+  <template x-for="(table, index) in openTables" :key="table.id">
     <div @click="table.status !== 'available' ? handleTableClick(table) : null"
           class="clay-card p-6 flex flex-col items-center justify-center gap-4 transition-all hover:shadow-lg hover:scale-105 border-2"
           :class="{
@@ -99,6 +109,11 @@
                 <span x-text="table.guests ?? ((table.adults || 0) + (table.children || 0))"></span> guests
             </p>
         </template>
+
+        <div class="flex w-full gap-2 border-t border-slate-200 pt-3">
+            <button type="button" @click.stop="editTableNumber(table)" :disabled="isManagingTables || !canManageTable(table)" class="flex-1 rounded-lg border border-slate-300 bg-white px-2 py-2 text-[10px] font-black uppercase text-slate-700 transition hover:border-[#800000] hover:text-[#800000] disabled:cursor-not-allowed disabled:opacity-40">Edit #</button>
+            <button type="button" @click.stop="removeTable(table)" :disabled="isManagingTables || !canManageTable(table)" class="flex-1 rounded-lg border border-red-200 bg-white px-2 py-2 text-[10px] font-black uppercase text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
+        </div>
     </div>
 </template>
 </div>

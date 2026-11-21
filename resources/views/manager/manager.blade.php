@@ -213,7 +213,7 @@
                voidCodeInput: '',
                managerCode: '1234',
                salesPreset: 'today',
-               businessDate: '',
+               philippinesDate: '',
                businessDayCutoff: '00:00',
                savedBusinessDayCutoff: '00:00',
                businessDayCutoffLoaded: false,
@@ -247,12 +247,17 @@
                 // Open Tables Data
              openTables: [],
                 tableSyncError: '',
+                   tableManagementError: '',
+                   isManagingTables: false,
                 isRefreshingDashboard: false,
                 isClearingTable: false,
                 
                 // Inventory Data
                 formData: { id: null, name: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] },
                 products: [],
+                availableIngredients: [],
+                savingIngredientId: null,
+                inventoryError: '',
 
                 normalizeProducts(products) {
                     return products.map(product => ({
@@ -273,6 +278,60 @@
                     }
 
                     this.products = this.normalizeProducts(await response.json());
+                },
+
+                async loadIngredients() {
+                    const response = await fetch('{{ route('manager.api.ingredients.index') }}', {
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Unable to load shared ingredients.');
+                    }
+
+                    this.availableIngredients = await response.json();
+                    this.formData.ingredients = (this.formData.ingredients || []).map(ingredient => {
+                        const sharedIngredient = this.availableIngredients.find(item => item.id === ingredient.id);
+                        return sharedIngredient
+                            ? { ...ingredient, name: sharedIngredient.name, stock: sharedIngredient.stock }
+                            : ingredient;
+                    });
+                },
+
+                async saveIngredientStock(ingredient) {
+                    if (this.savingIngredientId !== null) {
+                        return;
+                    }
+
+                    const stock = Number(ingredient.stock);
+                    if (!Number.isInteger(stock) || stock < 0) {
+                        alert('Ingredient stock must be a whole number greater than or equal to zero.');
+                        return;
+                    }
+
+                    this.savingIngredientId = ingredient.id;
+
+                    try {
+                        const response = await fetch(`{{ route('manager.api.ingredients.index') }}/${ingredient.id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ stock })
+                        });
+                        const result = await response.json().catch(() => ({}));
+                        if (!response.ok) {
+                            throw new Error(Object.values(result.errors || {}).flat()[0] || result.message || 'Unable to update ingredient stock.');
+                        }
+
+                        await Promise.all([this.loadIngredients(), this.loadProducts()]);
+                    } catch (error) {
+                        alert(error.message || 'Unable to update ingredient stock.');
+                    } finally {
+                        this.savingIngredientId = null;
+                    }
                 },
 
                 async saveProductToDatabase(product) {
@@ -349,10 +408,11 @@
                         return '—';
                     }
 
-                    return new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, {
+                    return new Date(`${value.slice(0, 10)}T12:00:00+08:00`).toLocaleDateString(undefined, {
                         year: 'numeric',
                         month: 'short',
-                        day: 'numeric'
+                        day: 'numeric',
+                        timeZone: 'Asia/Manila'
                     });
                 },
 
@@ -385,7 +445,7 @@
                             throw new Error(result.message || 'Unable to load sales reports.');
                         }
 
-                        this.businessDate = result.business_date;
+                        this.philippinesDate = result.philippines_date;
                         if (!this.businessDayCutoffLoaded) {
                             this.businessDayCutoff = result.cutoff_time;
                             this.savedBusinessDayCutoff = result.cutoff_time;
@@ -579,6 +639,104 @@ async loadTablesFromStorage() {
                     this.tableSyncError = error.message;
                     console.error('Unable to synchronize the manager floorplan:', error);
                 }
+                },
+
+                canManageTable(table) {
+                    return table.status === 'available'
+                        && table.isPaid !== true
+                        && (table.orders || []).length === 0
+                        && Number(table.adults || 0) === 0
+                        && Number(table.children || 0) === 0
+                        && Number(table.guests || 0) === 0
+                        && Number(table.bill || 0) === 0;
+                },
+
+                async tableManagementRequest(url, method, data = null) {
+                    const response = await fetch(url, {
+                        method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'Accept': 'application/json'
+                        },
+                        ...(data === null ? {} : { body: JSON.stringify(data) })
+                    });
+                    const payload = await response.json();
+
+                    if (!response.ok) {
+                        const validationMessage = Object.values(payload.errors || {}).flat()[0];
+                        throw new Error(payload.message || validationMessage || 'Unable to update tables.');
+                    }
+
+                    return payload;
+                },
+
+                async addTable() {
+                    if (this.isManagingTables) {
+                        return;
+                    }
+
+                    this.isManagingTables = true;
+                    this.tableManagementError = '';
+                    try {
+                        await this.tableManagementRequest(
+                            @json(route('manager.api.tables.store')),
+                            'POST'
+                        );
+                        await this.loadTablesFromStorage();
+                        this.tableManagementError = '';
+                    } catch (error) {
+                        this.tableManagementError = error.message || 'Unable to add a table.';
+                    } finally {
+                        this.isManagingTables = false;
+                    }
+                },
+
+                async editTableNumber(table) {
+                    if (this.isManagingTables || !this.canManageTable(table)) {
+                        return;
+                    }
+
+                    const tableNumber = window.prompt('Enter the new table number:', table.id);
+                    if (tableNumber === null || tableNumber.trim() === '') {
+                        return;
+                    }
+
+                    this.isManagingTables = true;
+                    this.tableManagementError = '';
+                    try {
+                        const url = @json(route('manager.api.tables.update-number', ['tableNumber' => '__TABLE__']))
+                            .replace('__TABLE__', encodeURIComponent(table.id));
+                        await this.tableManagementRequest(url, 'PUT', { table_number: tableNumber.trim() });
+                        await this.loadTablesFromStorage();
+                    } catch (error) {
+                        this.tableManagementError = error.message || 'Unable to edit this table.';
+                    } finally {
+                        this.isManagingTables = false;
+                    }
+                },
+
+                async removeTable(table) {
+                    if (
+                        this.isManagingTables
+                        || !this.canManageTable(table)
+                        || !window.confirm(`Remove Table ${table.id}? Historical order records will be kept.`)
+                    ) {
+                        return;
+                    }
+
+                    this.isManagingTables = true;
+                    this.tableManagementError = '';
+                    try {
+                        const url = @json(route('manager.api.tables.destroy', ['tableNumber' => '__TABLE__']))
+                            .replace('__TABLE__', encodeURIComponent(table.id));
+                        await this.tableManagementRequest(url, 'DELETE');
+                        await this.loadTablesFromStorage();
+                    } catch (error) {
+                        this.tableManagementError = error.message || 'Unable to remove this table.';
+                    } finally {
+                        this.isManagingTables = false;
+                    }
                 },
 
                 async loadReservationsFromStorage() {
@@ -990,7 +1148,14 @@ async clearTable(tableId) {
                     const productToSave = {
                         ...this.formData,
                         name: this.formData.name.trim(),
-                        ingredients: (this.formData.ingredients || []).filter(ingredient => ingredient.name?.trim()),
+                        ingredients: (this.formData.ingredients || [])
+                            .filter(ingredient => ingredient.name?.trim())
+                            .map(ingredient => ({
+                                name: ingredient.name.trim(),
+                                ...(ingredient.id
+                                    ? { id: Number(ingredient.id) }
+                                    : { stock: Number(ingredient.stock || 0) })
+                            })),
                         addOns: (this.formData.addOns || []).filter(addOn => addOn.name?.trim())
                     };
 
@@ -1003,7 +1168,7 @@ async clearTable(tableId) {
 
                     try {
                         await this.saveProductToDatabase(productToSave);
-                        await this.loadProducts();
+                        await Promise.all([this.loadProducts(), this.loadIngredients()]);
                         this.closeModal();
                     } catch (error) {
                         this.productFormError = error.message || 'Unable to save product.';
@@ -1071,11 +1236,27 @@ async clearTable(tableId) {
 
                 addIngredient() {
                     this.formData.ingredients = this.formData.ingredients || [];
-                    this.formData.ingredients.push({ name: '', stock: 0 });
+                    this.formData.ingredients.push({ id: null, name: '', stock: 0 });
                 },
 
                 removeIngredient(index) {
                     this.formData.ingredients.splice(index, 1);
+                },
+
+                matchSharedIngredient(index) {
+                    const ingredient = this.formData.ingredients[index];
+                    const matchingIngredient = this.availableIngredients.find(sharedIngredient =>
+                        sharedIngredient.name.trim().toLocaleLowerCase() === ingredient.name.trim().toLocaleLowerCase()
+                    );
+
+                    if (matchingIngredient) {
+                        ingredient.id = matchingIngredient.id;
+                        ingredient.name = matchingIngredient.name;
+                        ingredient.stock = matchingIngredient.stock;
+                    } else if (ingredient.id) {
+                        ingredient.id = null;
+                        ingredient.stock = 0;
+                    }
                 },
 
                 calculateStockFromIngredients(product) {
@@ -1094,6 +1275,7 @@ async clearTable(tableId) {
 async init() {
             try {
 await this.loadProducts();
+await this.loadIngredients();
             } catch (error) {
                 alert(error.message);
             }
@@ -1120,6 +1302,25 @@ await this.loadProducts();
                     this.isRefreshingDashboard = false;
                 }
             }, 2000);
+
+            setInterval(async () => {
+                if (
+                    this.tab !== 'inventory'
+                    || document.hidden
+                    || this.showAddModal
+                    || this.editingProductId !== null
+                    || document.activeElement?.tagName === 'INPUT'
+                ) {
+                    return;
+                }
+
+                try {
+                    await Promise.all([this.loadProducts(), this.loadIngredients()]);
+                    this.inventoryError = '';
+                } catch (error) {
+                    this.inventoryError = error.message || 'Unable to refresh shared inventory.';
+                }
+            }, 5000);
 
             setInterval(() => {
                 if (!document.hidden) {

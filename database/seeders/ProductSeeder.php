@@ -34,7 +34,6 @@ class ProductSeeder extends Seeder
                     'selling_price' => 0,
                     'stock_quantity' => 0,
                     'add_ons' => [],
-                    'ingredients' => [],
                 ]);
             }
         }

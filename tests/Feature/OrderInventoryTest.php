@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\InventoryIngredient;
 use App\Models\Product;
 use App\Models\SalesShift;
 use App\Models\User;
@@ -12,6 +13,19 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $manager = User::factory()->create(['role' => 'manager']);
+
+    DB::table('restaurant_tables')->insert(
+        collect(range(1, 15))
+            ->map(fn (int $tableNumber): array => [
+                'table_number' => $tableNumber,
+                'is_active' => true,
+                'status' => 'available',
+                'orders' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])
+            ->all()
+    );
 
     SalesShift::query()->create([
         'started_by' => $manager->id,
@@ -77,6 +91,141 @@ test('waiter orders are saved and decrement product stock', function () {
             'price' => 115,
             'addonName' => 'Cheese',
         ]]);
+});
+
+test('a manager-added table above the old limit accepts orders', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+    $product = Product::create([
+        'name' => 'Chicken Meal',
+        'selling_price' => 150,
+        'stock_quantity' => 2,
+    ]);
+
+    $this->actingAs($manager)
+        ->postJson(route('manager.api.tables.store'))
+        ->assertCreated()
+        ->assertJsonPath('id', 16);
+
+    $this->postJson(route('orders.complete'), [
+        'table_number' => 16,
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertCreated();
+
+    $this->assertDatabaseHas('restaurant_tables', [
+        'table_number' => 16,
+        'status' => 'occupied',
+    ]);
+});
+
+test('orders cannot be placed at a manager-removed table', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+    $product = Product::create([
+        'name' => 'Chicken Meal',
+        'selling_price' => 150,
+        'stock_quantity' => 2,
+    ]);
+
+    $this->actingAs($manager)
+        ->postJson(route('manager.api.tables.store'))
+        ->assertCreated();
+
+    $this->deleteJson(route('manager.api.tables.destroy', ['tableNumber' => 16]))
+        ->assertSuccessful();
+
+    $this->postJson(route('orders.complete'), [
+        'table_number' => 16,
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('table_number');
+
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 2,
+    ]);
+});
+
+test('orders deduct shared ingredient stock across every linked product', function () {
+    $egg = InventoryIngredient::query()->create([
+        'name' => 'Egg',
+        'normalized_name' => 'egg',
+        'stock_quantity' => 10,
+    ]);
+    $patty = InventoryIngredient::query()->create([
+        'name' => 'Patty',
+        'normalized_name' => 'patty',
+        'stock_quantity' => 8,
+    ]);
+    $cucumber = InventoryIngredient::query()->create([
+        'name' => 'Cucumber',
+        'normalized_name' => 'cucumber',
+        'stock_quantity' => 10,
+    ]);
+
+    $tapsilog = Product::create([
+        'name' => 'Tapsilog',
+        'selling_price' => 100,
+        'stock_quantity' => 8,
+    ]);
+    $tapsilog->ingredients()->attach([$egg->id, $patty->id]);
+    $tapsilog->refreshStockQuantity();
+
+    $hatsilog = Product::create([
+        'name' => 'Hatsilog',
+        'selling_price' => 90,
+        'stock_quantity' => 10,
+    ]);
+    $hatsilog->ingredients()->attach([$egg->id, $cucumber->id]);
+    $hatsilog->refreshStockQuantity();
+
+    $this->postJson(route('orders.complete'), [
+        'items' => [['product_id' => $tapsilog->id, 'quantity' => 3]],
+    ])->assertCreated();
+
+    $this->assertDatabaseHas('products', [
+        'id' => $tapsilog->id,
+        'stock_quantity' => 5,
+    ]);
+    $this->assertDatabaseHas('products', [
+        'id' => $hatsilog->id,
+        'stock_quantity' => 7,
+    ]);
+    expect($egg->fresh()->stock_quantity)->toBe(7)
+        ->and($patty->fresh()->stock_quantity)->toBe(5)
+        ->and($cucumber->fresh()->stock_quantity)->toBe(10);
+});
+
+test('an order exceeding ingredient-based product stock is not saved or deducted', function () {
+    $cucumber = InventoryIngredient::query()->create([
+        'name' => 'Cucumber',
+        'normalized_name' => 'cucumber',
+        'stock_quantity' => 10,
+    ]);
+    $egg = InventoryIngredient::query()->create([
+        'name' => 'Egg',
+        'normalized_name' => 'egg',
+        'stock_quantity' => 8,
+    ]);
+    $product = Product::create([
+        'name' => 'Cucumber Egg Salad',
+        'selling_price' => 100,
+        'stock_quantity' => 8,
+    ]);
+    $product->ingredients()->attach([$cucumber->id, $egg->id]);
+    $product->refreshStockQuantity();
+
+    $this->postJson(route('orders.complete'), [
+        'items' => [['product_id' => $product->id, 'quantity' => 9]],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('items');
+
+    $this->assertDatabaseHas('products', [
+        'id' => $product->id,
+        'stock_quantity' => 8,
+    ]);
+    expect($cucumber->fresh()->stock_quantity)->toBe(10)
+        ->and($egg->fresh()->stock_quantity)->toBe(8);
+    $this->assertDatabaseCount('orders', 0);
 });
 
 test('orders can still be submitted before the optional booking type migration is deployed', function () {
@@ -271,17 +420,16 @@ test('advance orders keep their reserved status and guest count when sent to sta
         'stock_quantity' => 3,
     ]);
 
-    DB::table('restaurant_tables')->insert([
-        'table_number' => 6,
-        'status' => 'reserved-advance',
-        'adults' => 2,
-        'children' => 2,
-        'guests' => 4,
-        'bill' => 300,
-        'orders' => json_encode([]),
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    DB::table('restaurant_tables')
+        ->where('table_number', 6)
+        ->update([
+            'status' => 'reserved-advance',
+            'adults' => 2,
+            'children' => 2,
+            'guests' => 4,
+            'bill' => 300,
+            'orders' => json_encode([]),
+        ]);
 
     $this->postJson(route('orders.complete'), [
         'table_number' => '6',

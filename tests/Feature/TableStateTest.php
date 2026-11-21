@@ -8,11 +8,38 @@ use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    $now = now();
+
+    DB::table('restaurant_tables')->insert(
+        collect(range(1, 15))
+            ->map(fn (int $tableNumber): array => [
+                'table_number' => $tableNumber,
+                'is_active' => true,
+                'status' => 'available',
+                'orders' => json_encode([]),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])
+            ->all()
+    );
+});
+
 test('csrf token can be refreshed for an expired browser token', function () {
     $this->getJson(route('csrf-token'))
         ->assertSuccessful()
         ->assertJsonStructure(['token'])
         ->assertHeader('Cache-Control', 'no-store, private');
+});
+
+test('listing the floorplan does not create tables automatically', function () {
+    DB::table('restaurant_tables')->delete();
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertExactJson([]);
+
+    $this->assertDatabaseCount('restaurant_tables', 0);
 });
 
 test('table statuses are stored centrally and returned in the floorplan format', function () {
@@ -42,6 +69,93 @@ test('table statuses are stored centrally and returned in the floorplan format',
         ->assertJsonPath('1.status', 'occupied')
         ->assertJsonPath('1.guests', 3)
         ->assertJsonPath('1.orders.0.name', 'Dinner');
+});
+
+test('manager can add, renumber, and remove tables above the previous limit', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    $this->actingAs($manager)
+        ->postJson(route('manager.api.tables.store'))
+        ->assertCreated()
+        ->assertJsonPath('id', 16)
+        ->assertJsonPath('tableNumber', 16);
+
+    $this->putJson(route('manager.api.tables.update-number', ['tableNumber' => 16]), [
+        'table_number' => 20,
+    ])->assertSuccessful()
+        ->assertJsonPath('id', 20);
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonCount(16)
+        ->assertJsonPath('15.id', 20);
+
+    $this->deleteJson(route('manager.api.tables.destroy', ['tableNumber' => 20]))
+        ->assertSuccessful()
+        ->assertJsonPath('success', true);
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonCount(15);
+
+    $this->assertDatabaseHas('restaurant_tables', [
+        'table_number' => 20,
+        'is_active' => false,
+    ]);
+});
+
+test('manager cannot edit or remove a table with an active reservation or order', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+    $this->actingAs($manager);
+
+    $this->putJson(route('tables.update'), [
+        'tables' => [
+            ['id' => 1, 'status' => 'reserved-booking'],
+        ],
+    ])->assertSuccessful();
+
+    $this->putJson(route('manager.api.tables.update-number', ['tableNumber' => 1]), [
+        'table_number' => 20,
+    ])->assertConflict();
+
+    $this->deleteJson(route('manager.api.tables.destroy', ['tableNumber' => 1]))
+        ->assertConflict();
+
+    $shift = SalesShift::query()->create([
+        'started_by' => $manager->id,
+        'business_date' => now()->toDateString(),
+        'started_at' => now(),
+        'status' => 'open',
+    ]);
+
+    Order::query()->create([
+        'order_number' => 'ORD-TABLE-MANAGEMENT-PENDING',
+        'table_number' => '2',
+        'sales_shift_id' => $shift->id,
+        'status' => 'pending',
+        'total_amount' => 150,
+        'subtotal_amount' => 150,
+        'discount_amount' => 0,
+        'vat_amount' => 0,
+    ]);
+
+    $this->deleteJson(route('manager.api.tables.destroy', ['tableNumber' => 2]))
+        ->assertConflict();
+});
+
+test('a removed table cannot be restored by a stale floorplan update', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    $this->actingAs($manager)
+        ->deleteJson(route('manager.api.tables.destroy', ['tableNumber' => 15]))
+        ->assertSuccessful();
+
+    $this->putJson(route('tables.update'), [
+        'tables' => [
+            ['id' => 15, 'status' => 'occupied'],
+        ],
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('tables');
 });
 
 test('table status updates reject invalid statuses and duplicate table numbers', function () {

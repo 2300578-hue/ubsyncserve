@@ -64,6 +64,7 @@ class SalesShiftController extends Controller
 
         return response()->json([
             'business_date' => $today,
+            'philippines_date' => CarbonImmutable::now(self::BUSINESS_TIMEZONE)->toDateString(),
             'cutoff_time' => substr($setting->business_day_cutoff, 0, 5),
             'from' => $dates['from'],
             'to' => $dates['to'],
@@ -176,6 +177,7 @@ class SalesShiftController extends Controller
 
         return response()->json([
             'business_date' => $this->businessDate($setting->business_day_cutoff),
+            'philippines_date' => CarbonImmutable::now(self::BUSINESS_TIMEZONE)->toDateString(),
             'cutoff_time' => substr($setting->business_day_cutoff, 0, 5),
         ]);
     }

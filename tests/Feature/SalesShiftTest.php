@@ -5,8 +5,24 @@ use App\Models\SalesShift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    DB::table('restaurant_tables')->insert(
+        collect(range(1, 15))
+            ->map(fn (int $tableNumber): array => [
+                'table_number' => $tableNumber,
+                'is_active' => true,
+                'status' => 'available',
+                'orders' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])
+            ->all()
+    );
+});
 
 test('a manager can start a sales shift and sees empty shift totals', function () {
     $manager = User::factory()->create(['role' => 'manager']);
@@ -260,6 +276,24 @@ test('a manager can filter sales by business date and update the daily cutoff', 
         ->assertJsonPath('from', $yesterday)
         ->assertJsonPath('to', $yesterday)
         ->assertJsonCount(1, 'daily_reports');
+});
+
+test('sales day display follows the Philippines calendar date before the business cutoff', function () {
+    $manager = User::factory()->create(['role' => 'manager']);
+    Carbon::setTestNow(Carbon::parse('2026-11-21 17:04:00', 'UTC'));
+
+    try {
+        $this->actingAs($manager)
+            ->putJson(route('manager.api.sales-settings.update'), ['business_day_cutoff' => '03:00'])
+            ->assertSuccessful();
+
+        $this->getJson(route('manager.api.sales-shift.show'))
+            ->assertSuccessful()
+            ->assertJsonPath('business_date', '2026-11-21')
+            ->assertJsonPath('philippines_date', '2026-11-22');
+    } finally {
+        Carbon::setTestNow();
+    }
 });
 
 test('guest users cannot use sales shift controls', function () {

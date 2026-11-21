@@ -4,7 +4,7 @@
             <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Sales Day</p>
             <div class="mt-1 flex flex-wrap items-center gap-2">
                 <p class="text-sm font-black text-slate-800"
-                    x-text="formatBusinessDate(currentShift?.status === 'open' ? currentShift.business_date : businessDate)"></p>
+                    x-text="formatBusinessDate(philippinesDate)"></p>
                 <span class="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest"
                     :class="currentShift?.status === 'open' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'"
                     x-text="currentShift?.status === 'open' ? 'Open — recording sales' : 'Closed — ready to start'"></span>

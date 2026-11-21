@@ -14,23 +14,10 @@ class TableStateController extends Controller
 {
     public function index(): JsonResponse
     {
-        $now = now();
-
-        DB::table('restaurant_tables')->insertOrIgnore(
-            collect(range(1, 15))
-                ->map(fn (int $tableNumber): array => [
-                    'table_number' => $tableNumber,
-                    'status' => 'available',
-                    'orders' => json_encode([]),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ])
-                ->all()
-        );
-
         $this->clearEmptyAdvanceSelections();
 
         $tables = DB::table('restaurant_tables')
+            ->where('is_active', true)
             ->orderBy('table_number')
             ->get()
             ->map(fn (object $table): array => [
@@ -51,6 +38,7 @@ class TableStateController extends Controller
     private function clearEmptyAdvanceSelections(): void
     {
         $emptyAdvanceSelections = DB::table('restaurant_tables')
+            ->where('is_active', true)
             ->where('status', 'reserved-advance')
             ->where('is_paid', false)
             ->where('adults', 0)
@@ -67,6 +55,7 @@ class TableStateController extends Controller
 
             DB::table('restaurant_tables')
                 ->where('table_number', $table->table_number)
+                ->where('is_active', true)
                 ->where('status', 'reserved-advance')
                 ->where('is_paid', false)
                 ->where('adults', 0)
@@ -85,8 +74,8 @@ class TableStateController extends Controller
     public function update(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'tables' => ['required', 'array', 'min:1', 'max:15'],
-            'tables.*.id' => ['required', 'integer', 'between:1,15', 'distinct'],
+            'tables' => ['required', 'array', 'min:1'],
+            'tables.*.id' => ['required', 'integer', 'min:1', 'distinct'],
             'tables.*.status' => ['required', Rule::in([
                 'available',
                 'occupied',
@@ -105,18 +94,17 @@ class TableStateController extends Controller
 
         DB::transaction(function () use ($request, $validated): void {
             foreach ($validated['tables'] as $table) {
-                DB::table('restaurant_tables')->insertOrIgnore([
-                    'table_number' => $table['id'],
-                    'status' => 'available',
-                    'orders' => json_encode([]),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
                 $currentTable = DB::table('restaurant_tables')
                     ->where('table_number', $table['id'])
+                    ->where('is_active', true)
                     ->lockForUpdate()
                     ->first();
+
+                if ($currentTable === null) {
+                    throw ValidationException::withMessages([
+                        'tables' => ["Table {$table['id']} is no longer active."],
+                    ]);
+                }
 
                 $resultingGuests = $table['guests'] ?? (int) $currentTable->guests;
                 $resultingOrders = $table['orders']
@@ -177,6 +165,7 @@ class TableStateController extends Controller
         return DB::transaction(function () use ($request, $tableNumber): JsonResponse {
             $table = DB::table('restaurant_tables')
                 ->where('table_number', $tableNumber)
+                ->where('is_active', true)
                 ->lockForUpdate()
                 ->first();
 
@@ -208,6 +197,7 @@ class TableStateController extends Controller
 
             DB::table('restaurant_tables')
                 ->where('table_number', $tableNumber)
+                ->where('is_active', true)
                 ->update([
                     'status' => 'available',
                     'is_paid' => false,
@@ -222,5 +212,140 @@ class TableStateController extends Controller
 
             return response()->json(['success' => true]);
         });
+    }
+
+    public function store(): JsonResponse
+    {
+        $tableNumber = DB::transaction(function (): int {
+            $lastTable = DB::table('restaurant_tables')
+                ->orderByDesc('table_number')
+                ->lockForUpdate()
+                ->first(['table_number']);
+            $tableNumber = ((int) ($lastTable->table_number ?? 0)) + 1;
+
+            DB::table('restaurant_tables')->insert([
+                'table_number' => $tableNumber,
+                'is_active' => true,
+                'status' => 'available',
+                'orders' => json_encode([], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $tableNumber;
+        });
+
+        return response()->json([
+            'id' => $tableNumber,
+            'tableNumber' => $tableNumber,
+        ], 201);
+    }
+
+    public function updateNumber(Request $request, int $tableNumber): JsonResponse
+    {
+        $table = DB::table('restaurant_tables')
+            ->where('table_number', $tableNumber)
+            ->where('is_active', true)
+            ->first();
+
+        if ($table === null) {
+            return response()->json(['message' => 'Table not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'table_number' => [
+                'required',
+                'integer',
+                'min:1',
+                Rule::unique('restaurant_tables', 'table_number')->ignore($table->id),
+            ],
+        ]);
+
+        return DB::transaction(function () use ($table, $validated): JsonResponse {
+            $lockedTable = DB::table('restaurant_tables')
+                ->where('id', $table->id)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+
+            if ($lockedTable === null) {
+                return response()->json(['message' => 'Table not found.'], 404);
+            }
+
+            $this->ensureTableCanBeManaged($lockedTable);
+
+            DB::table('restaurant_tables')
+                ->where('id', $lockedTable->id)
+                ->update([
+                    'table_number' => $validated['table_number'],
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json([
+                'id' => (int) $validated['table_number'],
+                'tableNumber' => (int) $validated['table_number'],
+            ]);
+        });
+    }
+
+    public function destroy(int $tableNumber): JsonResponse
+    {
+        return DB::transaction(function () use ($tableNumber): JsonResponse {
+            $table = DB::table('restaurant_tables')
+                ->where('table_number', $tableNumber)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->first();
+
+            if ($table === null) {
+                return response()->json(['message' => 'Table not found.'], 404);
+            }
+
+            $this->ensureTableCanBeManaged($table);
+
+            DB::table('restaurant_tables')
+                ->where('id', $table->id)
+                ->update([
+                    'is_active' => false,
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json(['success' => true]);
+        });
+    }
+
+    private function ensureTableCanBeManaged(object $table): void
+    {
+        $orders = json_decode($table->orders, true, flags: JSON_THROW_ON_ERROR);
+        $hasCurrentOrders = is_array($orders) && $orders !== [];
+        $hasCurrentGuests = (int) $table->adults > 0
+            || (int) $table->children > 0
+            || (int) $table->guests > 0;
+        $hasPendingOrders = $this->hasPendingOrders((int) $table->table_number);
+
+        if (
+            $table->status !== 'available'
+            || (bool) $table->is_paid
+            || $hasCurrentOrders
+            || $hasCurrentGuests
+            || (float) $table->bill > 0
+            || $hasPendingOrders
+        ) {
+            abort(409, 'Only an available table with no active orders or reservations can be edited or removed.');
+        }
+    }
+
+    private function hasPendingOrders(int $tableNumber): bool
+    {
+        $openSalesShiftId = SalesShift::query()
+            ->where('status', 'open')
+            ->value('id');
+
+        return $openSalesShiftId !== null
+            && DB::table('orders')
+                ->where('table_number', (string) $tableNumber)
+                ->where('sales_shift_id', $openSalesShiftId)
+                ->where('status', 'pending')
+                ->exists();
     }
 }

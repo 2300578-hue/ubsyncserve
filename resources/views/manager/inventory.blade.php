@@ -1,4 +1,7 @@
 <div class="space-y-8">
+    <div x-show="inventoryError" x-cloak role="alert"
+        class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        x-text="inventoryError"></div>
 
     <div class="mb-8 flex justify-between items-start">
         <div>
@@ -18,6 +21,45 @@
     </div>
 
 
+
+    <div class="clay-card overflow-hidden">
+        <div class="p-5 border-b bg-slate-50/50">
+            <h3 class="text-xs font-black text-slate-700 uppercase tracking-widest">Shared Ingredients</h3>
+            <p class="mt-1 text-xs text-slate-500">Restocking here updates every product that uses the ingredient.</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b-2 border-slate-200 bg-slate-50/50 text-left">
+                        <th class="px-4 py-4 font-black text-slate-700 uppercase text-xs">Ingredient</th>
+                        <th class="px-4 py-4 font-black text-slate-700 uppercase text-xs">Shared Stock</th>
+                        <th class="px-4 py-4 text-center font-black text-slate-700 uppercase text-xs">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <template x-for="ingredient in availableIngredients" :key="ingredient.id">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-4 py-3 font-bold text-slate-800" x-text="ingredient.name"></td>
+                            <td class="px-4 py-3">
+                                <input type="number" min="0" step="1" x-model.number="ingredient.stock"
+                                    class="w-full max-w-48 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none">
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <button type="button" @click="saveIngredientStock(ingredient)"
+                                    :disabled="savingIngredientId === ingredient.id"
+                                    class="px-4 py-2 bg-[#800000] text-white rounded-lg font-bold text-xs disabled:opacity-50">
+                                    <span x-text="savingIngredientId === ingredient.id ? 'Saving...' : 'Save Stock'"></span>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    <tr x-show="availableIngredients.length === 0">
+                        <td colspan="3" class="px-4 py-6 text-center text-sm text-slate-500">No shared ingredients yet. Add one while creating a product.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <div class="clay-card overflow-hidden">
         <div class="p-5 border-b bg-slate-50/50">
@@ -138,19 +180,34 @@
                     <label class="block text-xs font-black text-slate-700 uppercase mb-2">Ingredients</label>
                     <div class="space-y-3">
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
-                            <i class="fas fa-lightbulb"></i> <strong>Example:</strong> Eggs: 20 + Patty: 15 = Total Stock: 35
+                            <i class="fas fa-lightbulb"></i> Choose an existing ingredient to share its stock across products. New ingredient names create one shared stock record; each product order deducts one unit from every ingredient it uses.
                         </div>
+                        <datalist id="shared-ingredient-options">
+                            <template x-for="sharedIngredient in availableIngredients" :key="sharedIngredient.id">
+                                <option :value="sharedIngredient.name"></option>
+                            </template>
+                        </datalist>
                         <template x-for="(ingredient, idx) in formData.ingredients" :key="idx">
                             <div class="grid grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-lg">
                                 <div class="col-span-7">
                                     <label class="text-xs font-bold text-slate-600 block mb-1">Ingredient Name</label>
-                                    <input type="text" x-model="ingredient.name" placeholder="e.g., Patty, Eggs, Cheese" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none text-sm">
+                                    <input type="text" list="shared-ingredient-options" x-model="ingredient.name" @input="matchSharedIngredient(idx)" placeholder="e.g., Patty, Eggs, Cheese" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none text-sm">
                                 </div>
                                 <div class="col-span-5">
-                                    <label class="text-xs font-bold text-slate-600 block mb-1">Current Stock</label>
-                                    <input type="number" x-model.number="ingredient.stock" placeholder="0" min="0" step="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none text-sm">
+                                    <template x-if="ingredient.id">
+                                        <div>
+                                            <label class="text-xs font-bold text-slate-600 block mb-1">Shared Stock (fixed)</label>
+                                            <div class="w-full px-3 py-2 border rounded-lg bg-slate-100 text-sm font-bold text-slate-700" x-text="ingredient.stock"></div>
+                                        </div>
+                                    </template>
+                                    <template x-if="!ingredient.id">
+                                        <div>
+                                            <label class="text-xs font-bold text-slate-600 block mb-1">Starting Stock</label>
+                                            <input type="number" x-model.number="ingredient.stock" placeholder="0" min="0" step="1" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none text-sm">
+                                        </div>
+                                    </template>
                                 </div>
-                                <button type="button" @click="removeIngredient(idx)" class="col-span-12 px-3 py-2 bg-red-100 text-red-700 rounded-lg font-bold text-xs hover:bg-red-200 mt-2">Remove</button>
+                                <button type="button" @click="removeIngredient(idx)" class="col-span-12 px-3 py-2 bg-red-100 text-red-700 rounded-lg font-bold text-xs hover:bg-red-200 mt-2">Remove from this product</button>
                             </div>
                         </template>
                         <button type="button" @click="addIngredient()" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-slate-200 text-slate-700 rounded-2xl font-black uppercase text-xs hover:bg-slate-300 transition-all">

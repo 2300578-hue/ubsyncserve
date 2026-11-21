@@ -6,11 +6,25 @@ use App\Models\Product;
 use App\Models\SalesShift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $manager = User::factory()->create(['role' => 'manager']);
+
+    DB::table('restaurant_tables')->insert(
+        collect(range(1, 15))
+            ->map(fn (int $tableNumber): array => [
+                'table_number' => $tableNumber,
+                'is_active' => true,
+                'status' => 'available',
+                'orders' => json_encode([]),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])
+            ->all()
+    );
 
     SalesShift::query()->create([
         'started_by' => $manager->id,

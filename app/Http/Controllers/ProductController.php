@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\InventoryIngredient;
 use App\Models\Order;
 use App\Models\PrintJob;
 use App\Models\Product;
@@ -10,6 +11,7 @@ use App\Models\SalesShift;
 use App\Services\PrintJobService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ProductSeeder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,21 +29,21 @@ class ProductController extends Controller
             $productSeeder->run();
         }
 
-        return response()->json(Product::query()->latest('id')->get()->map->toCatalogArray());
+        return response()->json(Product::query()->with('ingredients')->latest('id')->get()->map->toCatalogArray());
     }
 
     public function store(Request $request): JsonResponse
     {
-        $product = Product::create($this->validatedData($request));
+        $product = $this->saveProduct($this->validatedData($request));
 
-        return response()->json($product->toCatalogArray(), 201);
+        return response()->json($product->load('ingredients')->toCatalogArray(), 201);
     }
 
     public function update(Request $request, Product $product): JsonResponse
     {
-        $product->update($this->validatedData($request));
+        $product = $this->saveProduct($this->validatedData($request), $product);
 
-        return response()->json($product->fresh()->toCatalogArray());
+        return response()->json($product->load('ingredients')->toCatalogArray());
     }
 
     public function destroy(Product $product): JsonResponse
@@ -60,7 +62,7 @@ class ProductController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.add_ons' => ['sometimes', 'array'],
             'items.*.add_ons.*.name' => ['required', 'string', 'max:255'],
-            'table_number' => ['nullable', 'integer', 'between:1,15'],
+            'table_number' => ['nullable', 'integer', 'min:1'],
             'booking_type' => ['nullable', Rule::in(['advance-order'])],
             'payment_method' => ['sometimes', 'nullable', Rule::in(['gcash', 'paymaya'])],
             'adults' => ['sometimes', 'integer', 'min:0'],
@@ -128,20 +130,44 @@ class ProductController extends Controller
                 ]);
             }
 
-            $itemsByProduct = collect($data['items'])->groupBy('product_id');
+            $itemsByProduct = collect($data['items'])->groupBy('product_id')->sortKeys();
             $products = [];
 
             foreach ($itemsByProduct as $productId => $items) {
                 $product = Product::query()->lockForUpdate()->findOrFail($productId);
                 $quantity = $items->sum('quantity');
-                if ($product->stock_quantity < $quantity) {
+                $ingredientIds = $product->ingredients()
+                    ->orderBy('ingredients.id')
+                    ->pluck('ingredients.id')
+                    ->all();
+                $ingredients = $ingredientIds === []
+                    ? collect()
+                    : InventoryIngredient::query()
+                        ->whereKey($ingredientIds)
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get();
+                $availableStock = $ingredients->isNotEmpty()
+                    ? $ingredients->min('stock_quantity')
+                    : $product->stock_quantity;
+
+                if ($availableStock < $quantity) {
                     throw ValidationException::withMessages([
                         'items' => ["Not enough stock for {$product->name}."],
                     ]);
                 }
 
                 $products[$productId] = $product;
-                $product->decrement('stock_quantity', $quantity);
+                if ($ingredients->isNotEmpty()) {
+                    $ingredients->each(fn (InventoryIngredient $ingredient) => $ingredient->decrement('stock_quantity', $quantity));
+                    Product::query()
+                        ->whereHas('ingredients', fn (Builder $query) => $query->whereIn('ingredients.id', $ingredientIds))
+                        ->with('ingredients')
+                        ->get()
+                        ->each(fn (Product $relatedProduct) => $relatedProduct->refreshStockQuantity());
+                } else {
+                    $product->decrement('stock_quantity', $quantity);
+                }
             }
 
             $orderItems = collect($data['items'])->map(function (array $item) use ($products): array {
@@ -185,18 +211,17 @@ class ProductController extends Controller
             $tableNumber = $data['table_number'] ?? null;
             if ($tableNumber !== null) {
                 $tableNumber = (int) $tableNumber;
-                DB::table('restaurant_tables')->insertOrIgnore([
-                    'table_number' => $tableNumber,
-                    'status' => 'available',
-                    'orders' => json_encode([]),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
                 $tableState = DB::table('restaurant_tables')
                     ->where('table_number', $tableNumber)
+                    ->where('is_active', true)
                     ->lockForUpdate()
                     ->first();
+
+                if ($tableState === null) {
+                    throw ValidationException::withMessages([
+                        'table_number' => ['This table is no longer available. Please select an active table.'],
+                    ]);
+                }
 
                 if (
                     ($data['booking_type'] ?? null) === 'advance-order'
@@ -341,10 +366,10 @@ class ProductController extends Controller
             'addOns.*.name' => ['nullable', 'string', 'max:255'],
             'addOns.*.price' => ['nullable', 'numeric', 'min:0'],
             'ingredients' => ['nullable', 'array'],
-            'ingredients.*.name' => ['required_with:ingredients.*.stock', 'string', 'max:255'],
-            'ingredients.*.stock' => ['required', 'integer', 'min:0'],
+            'ingredients.*.id' => ['nullable', 'integer', 'exists:ingredients,id'],
+            'ingredients.*.name' => ['required', 'string', 'max:255'],
+            'ingredients.*.stock' => ['nullable', 'integer', 'min:0'],
         ]);
-        $ingredients = $validated['ingredients'] ?? [];
 
         return [
             'name' => $validated['name'],
@@ -352,9 +377,90 @@ class ProductController extends Controller
             'cost_price' => $validated['cost'] ?? 0,
             'selling_price' => $validated['sellingPrice'],
             'image' => $validated['img'] ?? null,
-            'stock_quantity' => array_sum(array_column($ingredients, 'stock')),
             'add_ons' => $validated['addOns'] ?? [],
-            'ingredients' => $ingredients,
+            'ingredients' => $validated['ingredients'] ?? [],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function saveProduct(array $data, ?Product $product = null): Product
+    {
+        return DB::transaction(function () use ($data, $product): Product {
+            $ingredientInputs = $data['ingredients'];
+            unset($data['ingredients']);
+
+            if ($product === null) {
+                $product = Product::create($data);
+            } else {
+                $product = Product::query()->lockForUpdate()->findOrFail($product->id);
+                $product->update($data);
+            }
+
+            $this->syncIngredients($product, $ingredientInputs);
+            $product->refreshStockQuantity();
+
+            return $product;
+        });
+    }
+
+    /**
+     * @param  array<int, array{id?: int|null, name: string, stock?: int|null}>  $ingredientInputs
+     */
+    private function syncIngredients(Product $product, array $ingredientInputs): void
+    {
+        $ingredientIds = [];
+        $ingredientInputs = collect($ingredientInputs)
+            ->sortBy(static fn (array $ingredient): string => Str::lower(trim($ingredient['name'])))
+            ->values()
+            ->all();
+
+        foreach ($ingredientInputs as $index => $ingredientInput) {
+            $name = trim($ingredientInput['name']);
+            if ($name === '') {
+                throw ValidationException::withMessages([
+                    "ingredients.{$index}.name" => ['Ingredient name is required.'],
+                ]);
+            }
+
+            $normalizedName = Str::lower($name);
+            $ingredient = isset($ingredientInput['id'])
+                ? InventoryIngredient::query()->lockForUpdate()->findOrFail($ingredientInput['id'])
+                : InventoryIngredient::query()->where('normalized_name', $normalizedName)->lockForUpdate()->first();
+
+            if ($ingredient !== null) {
+                if ($ingredient->normalized_name !== $normalizedName) {
+                    throw ValidationException::withMessages([
+                        "ingredients.{$index}.name" => ['Select the matching shared ingredient.'],
+                    ]);
+                }
+
+                if (in_array($ingredient->id, $ingredientIds, true)) {
+                    throw ValidationException::withMessages([
+                        "ingredients.{$index}.name" => ['An ingredient can only be added once to a product.'],
+                    ]);
+                }
+
+                $ingredientIds[] = $ingredient->id;
+
+                continue;
+            }
+
+            if (! array_key_exists('stock', $ingredientInput) || $ingredientInput['stock'] === null) {
+                throw ValidationException::withMessages([
+                    "ingredients.{$index}.stock" => ['Enter the initial stock for this new shared ingredient.'],
+                ]);
+            }
+
+            $ingredient = InventoryIngredient::query()->create([
+                'name' => $name,
+                'normalized_name' => $normalizedName,
+                'stock_quantity' => $ingredientInput['stock'],
+            ]);
+            $ingredientIds[] = $ingredient->id;
+        }
+
+        $product->ingredients()->sync($ingredientIds);
     }
 }
