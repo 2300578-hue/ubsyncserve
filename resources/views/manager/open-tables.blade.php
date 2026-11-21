@@ -120,8 +120,9 @@
 </template>
 </div>
 
+<template x-teleport="body">
     <div x-show="tableManagementAlert" x-cloak x-transition role="alert" aria-live="assertive" class="fixed right-4 top-4 z-[1600] rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 shadow-xl" x-text="tableManagementAlert"></div>
-    <div x-show="showTableManagerModal" x-cloak @click.self="showTableManagerModal = false" class="fixed inset-0 z-[1500] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 sm:items-center">
+    <div x-show="showTableManagerModal" x-cloak @click.self="showTableManagerModal = false" class="fixed inset-0 z-[1500] flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm sm:items-center">
         <div @click.stop class="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-white/20 bg-white shadow-2xl">
             <div class="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                 <div>
@@ -169,6 +170,7 @@
             </div>
         </div>
     </div>
+</template>
    <!-- ================= ORDER / BILL MODAL ================= -->
 <template x-teleport="body">
     <div x-show="showOrderModal" x-cloak 
