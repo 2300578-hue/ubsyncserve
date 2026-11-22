@@ -18,18 +18,15 @@ function reservationConfirmation() {
                 || !Number.isInteger(Number(this.confirmation.tableId))
                 || Number(this.confirmation.tableId) < 1
             ) {
+                this.clearCustomerFlowState();
                 window.location.replace(document.querySelector('[data-confirmation-type]').dataset.selectBookingUrl);
+                return;
             }
+
+            this.clearCustomerFlowState();
         },
 
-        formatCurrency(value) {
-            return '₱' + Number(value).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        },
-
-        returnToMenu() {
+        clearCustomerFlowState() {
             [
                 'customer_confirmation',
                 'customer_order_cart',
@@ -41,8 +38,6 @@ function reservationConfirmation() {
                 'customer_payment_method',
                 'customer_last_submitted_order'
             ].forEach(key => localStorage.removeItem(key));
-
-            window.location.href = document.querySelector('[data-confirmation-type]').dataset.homeUrl;
         }
     };
 }
