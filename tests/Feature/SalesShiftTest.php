@@ -278,7 +278,7 @@ test('a manager can filter sales by business date and update the daily cutoff', 
         ->assertJsonCount(1, 'daily_reports');
 });
 
-test('sales day display follows the Philippines calendar date before the business cutoff', function () {
+test('sales day and daily shift report use the same business date before the cutoff', function () {
     $manager = User::factory()->create(['role' => 'manager']);
     Carbon::setTestNow(Carbon::parse('2026-11-21 17:04:00', 'UTC'));
 
@@ -287,10 +287,16 @@ test('sales day display follows the Philippines calendar date before the busines
             ->putJson(route('manager.api.sales-settings.update'), ['business_day_cutoff' => '03:00'])
             ->assertSuccessful();
 
+        $shift = $this->postJson(route('manager.api.sales-shift.start'), ['opening_float' => 0])
+            ->assertCreated()
+            ->json('shift');
+
         $this->getJson(route('manager.api.sales-shift.show'))
             ->assertSuccessful()
             ->assertJsonPath('business_date', '2026-11-21')
-            ->assertJsonPath('philippines_date', '2026-11-22');
+            ->assertJsonPath('philippines_date', '2026-11-22')
+            ->assertJsonPath('current_shift.id', $shift['id'])
+            ->assertJsonPath('daily_reports.0.business_date', '2026-11-21');
     } finally {
         Carbon::setTestNow();
     }

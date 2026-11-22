@@ -3,6 +3,13 @@
         <div>
             <h1 class="text-3xl font-black uppercase tracking-tighter text-slate-800">Sales History</h1>
             <p class="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-600">Daily archives and Z-Read summaries</p>
+            <p class="mt-1 text-xs font-semibold text-slate-500">
+                Report period:
+                <span class="font-bold text-slate-700"
+                    x-text="salesShiftReport.from === salesShiftReport.to
+                        ? formatBusinessDate(salesShiftReport.from)
+                        : formatBusinessDate(salesShiftReport.from) + ' – ' + formatBusinessDate(salesShiftReport.to)"></span>
+            </p>
         </div>
         <div class="flex flex-wrap items-center gap-2 print:hidden">
             <a :href="salesExportUrl"

@@ -307,8 +307,9 @@
                     <span class="text-sm font-semibold text-emerald-700" x-text="(discountType === 'senior' ? 'Senior Citizen' : 'PWD') + ' discount (20%):'"></span>
                     <span class="text-sm font-bold text-emerald-700" x-text="'−' + formatCurrency(discountAmount)"></span>
                 </div>
+                <!-- VAT 5% -->
                 <div class="flex justify-between items-center">
-                    <span class="text-sm font-semibold text-slate-600">VAT (12%):</span>
+                    <span class="text-sm font-semibold text-slate-600">VAT (5%):</span>
                     <span class="text-lg font-bold text-slate-900" x-text="formatCurrency(vatAmount)"></span>
                 </div>
 
@@ -352,12 +353,8 @@
             showOrderSummaryModal: false,
             currentOrderId: '',
             isSubmittingOrder: false,
-            orderSubmissionSignature: null,
-            orderSubmissionKey: null,
             discountType: '',
             orderError: '',
-            vatRate: @json(config('sales.vat_rate')),
-            discountRate: @json(config('sales.senior_pwd_discount_rate')),
 
             async initStore() {
                 try {
@@ -400,7 +397,7 @@
             },
 
             get discountAmount() {
-                return this.discountType ? Math.round(this.cartTotal * this.discountRate * 100) / 100 : 0;
+                return this.discountType ? Math.round(this.cartTotal * 0.20 * 100) / 100 : 0;
             },
 
             get discountedSubtotal() {
@@ -408,7 +405,7 @@
             },
 
             get vatAmount() {
-                return this.discountType ? 0 : Math.round(this.discountedSubtotal * this.vatRate * 100) / 100;
+                return Math.round(this.discountedSubtotal * 0.05 * 100) / 100;
             },
 
             get grandTotal() {
@@ -417,33 +414,6 @@
 
             formatCurrency(val) {
                 return '₱' + parseFloat(val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            },
-
-            getOrderSubmissionKey() {
-                const signature = JSON.stringify({
-                    table_number: this.tableNumber,
-                    adults: this.adults,
-                    children: this.children,
-                    items: this.cart.map(item => ({
-                        product_id: item.id,
-                        quantity: item.qty,
-                        add_ons: (item.selectedAddOns || []).map(addOn => addOn.name)
-                    })),
-                    discount_type: this.discountType || null
-                });
-
-                if (this.orderSubmissionSignature !== signature) {
-                    const bytes = new Uint8Array(16);
-                    window.crypto.getRandomValues(bytes);
-                    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-                    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-                    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
-
-                    this.orderSubmissionSignature = signature;
-                    this.orderSubmissionKey = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-                }
-
-                return this.orderSubmissionKey;
             },
 
             formatDateTime() {
@@ -611,7 +581,6 @@
                 let stockResult;
                 try {
                     const formData = new FormData();
-                    formData.append('idempotency_key', this.getOrderSubmissionKey());
                     if (this.tableNumber) {
                         formData.append('table_number', this.tableNumber);
                     }
@@ -650,8 +619,6 @@
                     return;
                 }
                 this.currentOrderId = stockResult.order_number;
-                this.orderSubmissionSignature = null;
-                this.orderSubmissionKey = null;
 
                 const transaction = {
                     orderId: this.currentOrderId,
@@ -671,9 +638,7 @@
 
                 this.showOrderSummaryModal = false;
                 const notification = document.createElement('div');
-                notification.textContent = stockResult.print_job_queued
-                    ? 'Order successfully sent to stations. Order slip queued for printing!'
-                    : 'Order successfully sent to stations!';
+                notification.textContent = 'Order successfully sent to stations!';
                 notification.className = 'fixed top-5 right-5 z-[2000] rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white shadow-xl';
                 document.body.appendChild(notification);
                 window.setTimeout(() => notification.remove(), 2500);

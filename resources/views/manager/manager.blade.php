@@ -264,7 +264,7 @@
                voidCodeInput: '',
                managerCode: '1234',
                salesPreset: 'today',
-               philippinesDate: '',
+               businessDate: '',
                businessDayCutoff: '00:00',
                savedBusinessDayCutoff: '00:00',
                businessDayCutoffLoaded: false,
@@ -552,7 +552,7 @@
                             throw new Error(result.message || 'Unable to load sales reports.');
                         }
 
-                        this.philippinesDate = result.philippines_date;
+                        this.businessDate = result.business_date;
                         if (!this.businessDayCutoffLoaded) {
                             this.businessDayCutoff = result.cutoff_time;
                             this.savedBusinessDayCutoff = result.cutoff_time;
