@@ -117,14 +117,15 @@ class CustomerBookingController extends Controller
             }
 
             $normalizedEmail = $this->normalizeGmailAddress($validated['email']);
-            if ($normalizedEmail !== null && $this->hasConfirmedReservationEmail($normalizedEmail)) {
+            if ($normalizedEmail !== null && $this->hasActiveReservationEmail($normalizedEmail)) {
                 throw ValidationException::withMessages([
-                    'email' => ['This Gmail account already has a confirmed reservation.'],
+                    'email' => ['This email account is already in use.'],
                 ]);
             }
 
-            return DB::table('customer_bookings')->insertGetId([
-                'booking_reference' => 'RES-'.strtoupper(Str::random(8)),
+            $bookingReference = 'RES-'.strtoupper(Str::random(8));
+            $bookingId = DB::table('customer_bookings')->insertGetId([
+                'booking_reference' => $bookingReference,
                 'type' => $validated['type'],
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -139,6 +140,17 @@ class CustomerBookingController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            if (Schema::hasTable('confirmed_reservation_emails') && $normalizedEmail !== null) {
+                DB::table('confirmed_reservation_emails')->insertOrIgnore([
+                    'normalized_email' => $normalizedEmail,
+                    'booking_reference' => $bookingReference,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return $bookingId;
         });
 
         return response()->json([
@@ -333,18 +345,9 @@ class CustomerBookingController extends Controller
         return str_replace('.', '', $localPart).'@gmail.com';
     }
 
-    private function hasConfirmedReservationEmail(string $normalizedEmail): bool
+    private function hasActiveReservationEmail(string $normalizedEmail): bool
     {
-        if (Schema::hasTable('confirmed_reservation_emails')) {
-            return DB::table('confirmed_reservation_emails as claims')
-                ->join('customer_bookings as bookings', 'bookings.booking_reference', '=', 'claims.booking_reference')
-                ->where('claims.normalized_email', $normalizedEmail)
-                ->whereNull('bookings.archived_at')
-                ->exists();
-        }
-
         return DB::table('customer_bookings')
-            ->where('status', 'confirmed')
             ->whereNull('archived_at')
             ->pluck('email')
             ->contains(fn (string $email): bool => $this->normalizeGmailAddress($email) === $normalizedEmail);

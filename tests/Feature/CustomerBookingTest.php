@@ -136,8 +136,7 @@ test('confirmation email is only sent for an active confirmed reservation', func
         ->assertJsonPath('message', 'Reservation not found or no longer active.');
 });
 
-test('only one reservation using a Gmail account can be confirmed', function () {
-    $manager = User::factory()->create(['role' => 'manager']);
+test('a Gmail account cannot submit another reservation while its first one is active', function () {
     $reservationData = [
         'type' => 'table-reservation',
         'name' => 'Jane Doe',
@@ -152,40 +151,17 @@ test('only one reservation using a Gmail account can be confirmed', function () 
     $firstReservation = $this->postJson(route('customer.book.post'), $reservationData)
         ->assertCreated()
         ->json('booking_id');
-    $secondReservation = $this->postJson(route('customer.book.post'), $reservationData)
-        ->assertCreated()
-        ->json('booking_id');
-    $firstBookingReference = DB::table('customer_bookings')
-        ->where('id', $firstReservation)
-        ->value('booking_reference');
-    $secondBookingReference = DB::table('customer_bookings')
-        ->where('id', $secondReservation)
-        ->value('booking_reference');
-
-    $this->actingAs($manager)
-        ->patchJson(route('customer.bookings.status', $firstBookingReference), ['status' => 'confirmed'])
-        ->assertSuccessful();
-
-    $this->patchJson(route('customer.bookings.status', $secondBookingReference), ['status' => 'confirmed'])
-        ->assertConflict()
-        ->assertJsonPath('message', 'This Gmail account already has a confirmed reservation.');
+    $this->postJson(route('customer.book.post'), [
+        ...$reservationData,
+        'email' => 'janedoe+another@gmail.com',
+    ])->assertUnprocessable()
+        ->assertJsonPath('errors.email.0', 'This email account is already in use.');
 
     $this->assertDatabaseHas('customer_bookings', [
         'id' => $firstReservation,
-        'status' => 'confirmed',
-    ]);
-
-    $this->assertDatabaseHas('customer_bookings', [
-        'id' => $secondReservation,
         'status' => 'pending',
     ]);
-
-    $this->postJson(route('customer.book.post'), [
-        ...$reservationData,
-        'email' => 'janedoe@gmail.com',
-    ])->assertUnprocessable()
-        ->assertJsonValidationErrors('email');
-
+    $this->assertDatabaseCount('customer_bookings', 1);
     expect(DB::table('confirmed_reservation_emails')->count())->toBe(1);
 });
 

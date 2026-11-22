@@ -251,10 +251,11 @@
                 },
                 body: formData
             });
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Unable to submit your reservation.');
+                const validationMessage = Object.values(data.errors || {}).flat()[0];
+                throw new Error(validationMessage || data.message || 'Unable to submit your reservation.');
             }
 
             localStorage.setItem('customer_booking_type', type);
