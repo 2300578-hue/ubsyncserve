@@ -34,12 +34,17 @@
                     </div>
                 </div>
 
-                <p class="mb-3 text-xs font-black uppercase tracking-[0.24em] text-emerald-700">Successfully received</p>
+                <p class="mb-3 text-xs font-black uppercase tracking-[0.24em] text-emerald-700"
+                    x-text="type === 'order' ? 'Order received' : 'Successfully received'"></p>
                 <h1 class="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl"
-                    x-text="'Thank You! Your Reservation is Confirmed.'"></h1>
+                    x-text="type === 'order' ? 'Your Order is Confirmed.' : 'Thank You! Your Reservation is Confirmed.'"></h1>
                 <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600"
                     x-text="type === 'table-reservation'
                         ? `We have received your reservation and secured Table ${confirmation?.tableId}. We look forward to serving you!`
+                        : type === 'order'
+                            ? confirmation?.paymentStatus === 'paid'
+                                ? `Order ${confirmation?.orderNumber} has been received and its payment is confirmed. We look forward to serving you!`
+                                : `Order ${confirmation?.orderNumber} has been received for Table ${confirmation?.tableId}. GCash confirmation is pending with staff.`
                         : confirmation?.paymentStatus === 'paid'
                             ? 'We have received your payment and locked in your table schedule. We look forward to serving you!'
                             : `We have received your advance order and secured Table ${confirmation?.tableId}. GCash payment is pending staff confirmation; online payment processing is not configured yet.`"></p>

@@ -113,6 +113,11 @@ test('regular orders add twelve percent VAT to the subtotal', function () {
         ->assertJsonPath('subtotal_amount', 250)
         ->assertJsonPath('vat_amount', 30)
         ->assertJsonPath('total_amount', 280);
+
+    $this->getJson(route('tables.index'))
+        ->assertSuccessful()
+        ->assertJsonPath('4.bill', 250)
+        ->assertJsonPath('4.orders.0.vatAmount', 30);
 });
 
 test('a manager-added table above the old limit accepts orders', function () {

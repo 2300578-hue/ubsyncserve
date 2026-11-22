@@ -29,6 +29,13 @@ test('table selection builds the reservation details URL from the named route', 
         ->assertSee(str_replace('/', '\\/', $bookingDetailsUrl), false);
 });
 
+test('order confirmation page accepts customer order confirmations', function () {
+    $this->get(route('customer.confirmation', ['type' => 'order']))
+        ->assertSuccessful()
+        ->assertSee('data-confirmation-type="order"', false)
+        ->assertSee('Your Order is Confirmed.');
+});
+
 test('reservation form explains when sales are closed', function () {
     SalesShift::query()->update(['status' => 'closed']);
 

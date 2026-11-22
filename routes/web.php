@@ -179,7 +179,7 @@ Route::get('/checkout', function () {
 
 Route::get('/confirmation', function (Request $request) {
     $type = $request->query('type');
-    abort_unless(in_array($type, ['advance-order', 'table-reservation'], true), 404);
+    abort_unless(in_array($type, ['advance-order', 'order', 'table-reservation'], true), 404);
 
     return view('customer.confirmation', ['type' => $type]);
 })->name('customer.confirmation');

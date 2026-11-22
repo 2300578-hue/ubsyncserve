@@ -138,26 +138,57 @@
         </div>
 
         <div x-show="orderComplete" class="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" x-cloak>
-            <div class="w-full max-w-md rounded-[2rem] bg-white p-8 shadow-2xl text-center transform transition-all">
+            <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-[2rem] bg-white p-6 sm:p-8 shadow-2xl text-center transform transition-all"
+                role="dialog" aria-modal="true" aria-labelledby="order-confirmed-title">
                 <div class="mb-5 inline-flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-green-600 mx-auto border-4 border-white shadow-sm">
                     <i class="fas fa-check text-4xl"></i>
                 </div>
-                <h2 class="text-2xl font-black uppercase text-gray-900">Order Confirmed!</h2>
-                <p class="mt-2 text-sm text-gray-500">Your order has been submitted. It will appear in Performance Analytics after staff confirms your payment. Online payment processing is not configured yet.</p>
+                <h2 id="order-confirmed-title" class="text-2xl font-black uppercase text-gray-900">Order Confirmed!</h2>
+                <p class="mt-2 text-sm text-gray-500"
+                    x-text="paymentStatus === 'paid'
+                        ? 'Your order and payment have been confirmed.'
+                        : 'Your order has been received. GCash payment is pending staff confirmation; online payment processing is not configured yet.'"></p>
                 
                 <div class="mt-6 rounded-[1.5rem] bg-gray-50 p-5 text-left border border-gray-100">
-                   <p class="text-[11px] font-black uppercase tracking-widest text-gray-900 mb-4 border-b border-gray-200 pb-3">Receipt Summary</p>
+                    <p class="mb-4 border-b border-gray-200 pb-3 text-[11px] font-black uppercase tracking-widest text-gray-900">Order Summary</p>
+                    <p class="mb-3 text-xs font-bold text-gray-500">
+                        Order <span class="font-black text-gray-800" x-text="orderNumber"></span>
+                        <span class="mx-1">·</span>
+                        <span class="font-black text-gray-800" x-text="tableNumber ? 'Table ' + tableNumber : 'Unassigned'"></span>
+                    </p>
+                    <div class="mb-4 max-h-40 space-y-2 overflow-y-auto border-b border-gray-200 pb-4">
+                        <template x-for="(item, index) in cart" :key="`${item.id}-${index}`">
+                            <div class="flex justify-between gap-3 text-sm">
+                                <span class="text-gray-600">
+                                    <span class="font-bold text-gray-900" x-text="item.qty + ' × ' + item.name"></span>
+                                    <span x-show="item.addOns?.length" class="block text-xs text-gray-500"
+                                        x-text="(item.addOns || []).map(addon => addon.name).join(', ')"></span>
+                                </span>
+                                <span class="shrink-0 font-bold text-gray-900"
+                                    x-text="formatCurrency((item.price + (item.addOns || []).reduce((sum, addon) => sum + addon.price, 0)) * item.qty)"></span>
+                            </div>
+                        </template>
+                    </div>
                     <div class="space-y-2">
-                        <div class="flex justify-between"><span class="text-sm text-gray-500">Table:</span> <span class="text-sm font-black text-gray-900" x-text="tableNumber ? 'TABLE ' + tableNumber : 'UNASSIGNED'"></span></div>
-                        <div class="flex justify-between"><span class="text-sm text-gray-500">Method:</span> <span class="text-sm font-black text-gray-900" x-text="paymentMethodLabel + ' (pending confirmation)'"></span></div>
-                        <div class="flex justify-between pb-2 border-b border-gray-200"><span class="text-sm text-gray-500">Subtotal:</span> <span class="text-sm font-black text-gray-900" x-text="formatCurrency(cartTotal)"></span></div>
-                        <div class="flex justify-between pb-2"><span class="text-sm text-gray-500">VAT (12%):</span> <span class="text-sm font-black text-gray-900" x-text="formatCurrency(cartTotal * @json(config('sales.vat_rate')))"></span></div>
-                        <div class="flex justify-between pt-2 border-t border-gray-200 mt-2"><span class="text-base font-bold text-gray-900">Order Total:</span> <span class="text-base font-black text-[#800000]" x-text="formatCurrency(cartTotal * (1 + @json(config('sales.vat_rate'))))"></span></div>
+                        <div class="flex justify-between"><span class="text-sm text-gray-500">Payment:</span>
+                            <span class="text-sm font-black text-gray-900"
+                                x-text="paymentStatus === 'paid' ? paymentMethodLabel + ' · Paid' : paymentMethodLabel + ' · Pending staff confirmation'"></span>
+                        </div>
+                        <div class="flex justify-between"><span class="text-sm text-gray-500">Subtotal:</span>
+                            <span class="text-sm font-black text-gray-900" x-text="formatCurrency(serverSubtotal)"></span>
+                        </div>
+                        <div class="flex justify-between pb-2"><span class="text-sm text-gray-500">VAT (12%):</span>
+                            <span class="text-sm font-black text-gray-900" x-text="formatCurrency(serverVatAmount)"></span>
+                        </div>
+                        <div class="mt-2 flex justify-between border-t border-gray-200 pt-2">
+                            <span class="text-base font-bold text-gray-900">Order Total:</span>
+                            <span class="text-base font-black text-[#800000]" x-text="formatCurrency(serverTotal)"></span>
+                        </div>
                     </div>
                 </div>
                 
-                <button @click="clearOrder()" class="mt-8 w-full rounded-full bg-[#800000] px-8 py-4 text-sm font-black uppercase tracking-wide text-white shadow-md hover:bg-[#a00000] transition active:scale-95">
-                    Close & Return
+                <button @click="continueToConfirmation()" class="mt-6 w-full rounded-full bg-[#800000] px-8 py-4 text-sm font-black uppercase tracking-wide text-white shadow-md hover:bg-[#a00000] transition active:scale-95">
+                    Close
                 </button>
             </div>
         </div>
@@ -178,6 +209,10 @@
                 isSubmittingOrder: false,
                 orderError: '',
                 serverSubtotal: null,
+                serverVatAmount: 0,
+                serverTotal: 0,
+                orderNumber: '',
+                paymentStatus: 'pending',
 
                 async loadOrder() {
                     const savedCart = localStorage.getItem('customer_order_cart');
@@ -298,6 +333,13 @@
                             throw new Error(validationMessage || result.message || 'Unable to submit your order.');
                         }
 
+                        const confirmationType = this.bookingType === 'advance-order' ? 'advance-order' : 'order';
+                        this.orderNumber = result.order_number;
+                        this.paymentStatus = result.payment_status || 'pending';
+                        this.serverSubtotal = Number(result.subtotal_amount);
+                        this.serverVatAmount = Number(result.vat_amount);
+                        this.serverTotal = Number(result.total_amount);
+
                         localStorage.setItem('customer_last_submitted_order', JSON.stringify({
                             status: 'submitted',
                             tableId,
@@ -308,22 +350,20 @@
                             paymentStatus: result.payment_status || 'pending',
                             bookingType: this.bookingType
                         }));
-                        if (this.bookingType === 'advance-order') {
-                            localStorage.setItem('customer_confirmation', JSON.stringify({
-                                status: 'submitted',
-                                type: 'advance-order',
-                                tableId,
-                                orderNumber: result.order_number,
-                                paymentMethod: this.paymentMethod,
-                                subtotal: Number(result.subtotal_amount),
-                                total: Number(result.grand_total_amount ?? result.total_amount),
-                                paymentStatus: result.payment_status || 'pending'
-                            }));
-                        }
+                        localStorage.setItem('customer_confirmation', JSON.stringify({
+                            status: 'submitted',
+                            type: confirmationType,
+                            tableId,
+                            orderNumber: result.order_number,
+                            paymentMethod: this.paymentMethod,
+                            subtotal: this.serverSubtotal,
+                            vat: this.serverVatAmount,
+                            total: this.serverTotal,
+                            paymentStatus: this.paymentStatus
+                        }));
                         localStorage.removeItem('customer_pending_table_selection');
-                        this.serverSubtotal = Number(result.subtotal_amount);
-                        const subtotal = Number(result.subtotal_amount);
-                        this.orderComplete = this.bookingType !== 'advance-order';
+                        const subtotal = this.serverSubtotal;
+                        this.orderComplete = true;
 
                         try {
                             const analyticsHistory = JSON.parse(localStorage.getItem('ub_order_history') || '[]');
@@ -337,15 +377,12 @@
                                 paymentMethod: this.paymentMethod,
                                 bookingType: this.bookingType,
                                 items: orderItems,
-                                status: 'pending'
+                                status: this.paymentStatus === 'paid' ? 'completed' : 'pending'
                             });
                             localStorage.setItem('ub_order_history', JSON.stringify(analyticsHistory));
                             window.dispatchEvent(new Event('storage'));
                         } catch (error) {
                             console.error('Unable to save the local checkout analytics entry:', error);
-                        }
-                        if (this.bookingType === 'advance-order') {
-                            window.location.href = "{{ route('customer.confirmation', ['type' => 'advance-order']) }}";
                         }
                     } catch (error) {
                         this.orderError = error.message || 'Unable to submit your order. Please try again.';
@@ -354,17 +391,12 @@
                     }
                 },
 
-                clearOrder() {
-                    localStorage.removeItem('customer_order_cart');
-                    localStorage.removeItem('customer_order_table');
-                    localStorage.removeItem('customer_pending_table_selection');
-                    localStorage.removeItem('customer_guests_adults');
-                    localStorage.removeItem('customer_guests_children');
-                    localStorage.removeItem('customer_booking_type');
-                    localStorage.removeItem('customer_payment_method');
-                    localStorage.removeItem('customer_last_submitted_order');
-                    localStorage.removeItem('customer_confirmation');
-                    window.location.href = "{{ route('order.qrcodes') }}";
+                continueToConfirmation() {
+                    const confirmationUrl = this.bookingType === 'advance-order'
+                        ? @json(route('customer.confirmation', ['type' => 'advance-order']))
+                        : @json(route('customer.confirmation', ['type' => 'order']));
+
+                    window.location.href = confirmationUrl;
                 }
             };
         }
