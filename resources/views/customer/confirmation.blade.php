@@ -44,42 +44,6 @@
                             ? 'We have received your payment and locked in your table schedule. We look forward to serving you!'
                             : `We have received your advance order and secured Table ${confirmation?.tableId}. GCash payment is pending staff confirmation; online payment processing is not configured yet.`"></p>
 
-                <div class="mx-auto mt-8 max-w-md rounded-2xl border border-slate-100 bg-slate-50 p-5 text-left">
-                    <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
-                        <span class="text-xs font-black uppercase tracking-widest text-slate-500">Confirmation details</span>
-                        <span class="rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-800"
-                            x-text="type === 'table-reservation' ? 'Reserved' : (confirmation?.paymentStatus === 'paid' ? 'Paid - Test mode' : 'Order received')"></span>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex justify-between gap-4 text-sm">
-                            <span class="text-slate-500">Table</span>
-                            <span class="font-extrabold text-slate-900" x-text="confirmation ? 'Table ' + confirmation.tableId : ''"></span>
-                        </div>
-                        <div x-show="type === 'advance-order' && confirmation?.orderNumber" class="flex justify-between gap-4 text-sm">
-                            <span class="text-slate-500">Order number</span>
-                            <span class="font-extrabold text-slate-900" x-text="confirmation?.orderNumber"></span>
-                        </div>
-                        <div x-show="type === 'table-reservation' && confirmation?.guests" class="flex justify-between gap-4 text-sm">
-                            <span class="text-slate-500">Guests</span>
-                            <span class="font-extrabold text-slate-900" x-text="confirmation?.guests"></span>
-                        </div>
-                        <div x-show="type === 'advance-order'" class="flex justify-between gap-4 border-t border-slate-200 pt-3 text-sm">
-                            <span class="text-slate-500">Payment status</span>
-                            <span class="font-extrabold"
-                                :class="confirmation?.paymentStatus === 'paid' ? 'text-emerald-700' : 'text-amber-700'"
-                                x-text="confirmation?.paymentStatus === 'paid' ? 'Paid (local test mode)' : 'Pending staff confirmation'"></span>
-                        </div>
-                        <div x-show="type === 'advance-order' && confirmation?.total > 0" class="flex justify-between gap-4 border-t border-slate-200 pt-3 text-sm">
-                            <span class="text-slate-500">Order total</span>
-                            <span class="font-black text-[#800000]" x-text="formatCurrency(confirmation?.total)"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="button" @click="returnToMenu()" class="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#800000] px-7 py-4 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-rose-900/15 transition hover:bg-[#a00000] sm:w-auto">
-                    <span>Continue</span>
-                    <i class="fas fa-arrow-right" aria-hidden="true"></i>
-                </button>
                 <p class="mt-5 text-xs text-slate-400">Thank you for choosing UB Sync.</p>
             </div>
         </section>
