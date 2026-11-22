@@ -66,7 +66,7 @@
 
                 <div x-show="open" x-cloak class="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-xl py-2 z-[1100] border border-slate-200 overflow-hidden text-slate-800">
                     <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 mb-1">
-                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">Role: Waiter</p>
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">Role: Staff</p>
                         <p class="text-xs font-bold text-slate-800 truncate">{{ Auth::user()->email ?? 'waiter@ub.edu.ph' }}</p>
                     </div>
                     <div class="px-2">
