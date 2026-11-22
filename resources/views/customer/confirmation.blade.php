@@ -22,19 +22,19 @@
         data-select-booking-url="{{ route('order.select-booking') }}"
         data-home-url="{{ route('order.qrcodes') }}"
         class="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-6">
-        <div class="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-emerald-100/70 blur-3xl"></div>
-        <div class="absolute -bottom-28 -right-20 h-80 w-80 rounded-full bg-rose-100/70 blur-3xl"></div>
+        <div class="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-rose-100/70 blur-3xl"></div>
+        <div class="absolute -bottom-28 -right-20 h-80 w-80 rounded-full bg-red-100/60 blur-3xl"></div>
 
         <section class="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white bg-white shadow-2xl shadow-slate-200/80">
-            <div class="h-2 bg-gradient-to-r from-emerald-400 via-emerald-500 to-teal-500"></div>
+            <div class="h-2 bg-gradient-to-r from-[#a00000] via-[#800000] to-[#5f0000]"></div>
             <div class="px-6 py-10 text-center sm:px-12 sm:py-14">
-                <div class="mx-auto mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/60">
-                    <div class="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
+                <div class="mx-auto mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-rose-50 ring-8 ring-rose-50/70">
+                    <div class="flex h-16 w-16 items-center justify-center rounded-full bg-[#800000] text-white shadow-lg shadow-red-200">
                         <i class="fas fa-check text-3xl" aria-hidden="true"></i>
                     </div>
                 </div>
 
-                <p class="mb-3 text-xs font-black uppercase tracking-[0.24em] text-emerald-700"
+                <p class="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#800000]"
                     x-text="type === 'order' ? 'Order received' : 'Successfully received'"></p>
                 <h1 class="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl"
                     x-text="type === 'order' ? 'Your Order is Confirmed.' : 'Thank You! Your Reservation is Confirmed.'"></h1>
