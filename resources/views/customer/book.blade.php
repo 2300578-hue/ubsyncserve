@@ -49,7 +49,7 @@
 
             @unless ($salesOpen)
                 <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900" role="status">
-                    Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.
+                    Sales are currently closed.
                 </div>
             @endunless
 
@@ -229,7 +229,7 @@
     document.querySelector('form').addEventListener('submit', async function(e) {
         e.preventDefault();
         if (this.dataset.salesOpen !== 'true') {
-            alert('Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.');
+            alert('Sales are currently closed.');
             return;
         }
 

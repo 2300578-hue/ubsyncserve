@@ -34,7 +34,7 @@ test('reservation form explains when sales are closed', function () {
 
     $this->get(route('customer.book'))
         ->assertSuccessful()
-        ->assertSee('Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.')
+        ->assertSee('Sales are currently closed.')
         ->assertSee('data-sales-open="false"', false)
         ->assertSee('SALES ARE CURRENTLY CLOSED');
 });
@@ -52,7 +52,7 @@ test('customers cannot submit reservations while sales are closed', function (st
         'adults' => 2,
         'children' => 0,
     ])->assertConflict()
-        ->assertJsonPath('message', 'Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.');
+        ->assertJsonPath('message', 'Sales are currently closed.');
 
     $this->assertDatabaseCount('customer_bookings', 0);
 })->with([

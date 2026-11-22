@@ -113,7 +113,7 @@ class CustomerBookingController extends Controller
                 ->first();
 
             if ($openShift === null) {
-                abort(409, 'Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.');
+                abort(409, 'Sales are currently closed.');
             }
 
             $normalizedEmail = $this->normalizeGmailAddress($validated['email']);
