@@ -307,9 +307,8 @@
                     <span class="text-sm font-semibold text-emerald-700" x-text="(discountType === 'senior' ? 'Senior Citizen' : 'PWD') + ' discount (20%):'"></span>
                     <span class="text-sm font-bold text-emerald-700" x-text="'−' + formatCurrency(discountAmount)"></span>
                 </div>
-                <!-- VAT 5% -->
                 <div class="flex justify-between items-center">
-                    <span class="text-sm font-semibold text-slate-600">VAT (5%):</span>
+                    <span class="text-sm font-semibold text-slate-600">VAT (12%):</span>
                     <span class="text-lg font-bold text-slate-900" x-text="formatCurrency(vatAmount)"></span>
                 </div>
 
@@ -357,6 +356,8 @@
             orderSubmissionKey: null,
             discountType: '',
             orderError: '',
+            vatRate: @json(config('sales.vat_rate')),
+            discountRate: @json(config('sales.senior_pwd_discount_rate')),
 
             async initStore() {
                 try {
@@ -399,7 +400,7 @@
             },
 
             get discountAmount() {
-                return this.discountType ? Math.round(this.cartTotal * 0.20 * 100) / 100 : 0;
+                return this.discountType ? Math.round(this.cartTotal * this.discountRate * 100) / 100 : 0;
             },
 
             get discountedSubtotal() {
@@ -407,7 +408,7 @@
             },
 
             get vatAmount() {
-                return Math.round(this.discountedSubtotal * 0.05 * 100) / 100;
+                return this.discountType ? 0 : Math.round(this.discountedSubtotal * this.vatRate * 100) / 100;
             },
 
             get grandTotal() {

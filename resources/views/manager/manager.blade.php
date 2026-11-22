@@ -244,6 +244,7 @@
                 sidebarOpen: true,
                 tab: @json($activeTab ?? 'analytics'),
                 selectedTable: null,
+                vatRate: @json(config('sales.vat_rate')),
                 showAddModal: false,
                 showOrderModal: false,
                 showReservedModal: false,
@@ -479,6 +480,26 @@
 
                 selectedGrossSubtotal() {
                     return Number(this.selectedTable?.bill || 0) + this.selectedDiscountSummary().amount;
+                },
+
+                tableVatAmount(table = this.selectedTable) {
+                    const vatAmount = (table?.orders || []).reduce((total, item) => {
+                        const storedVat = Number(item.vatAmount);
+                        if (Number.isFinite(storedVat)) {
+                            return total + storedVat;
+                        }
+
+                        const itemNetAmount = Math.max(
+                            0,
+                            (Number(item.price || 0) * Number(item.qty || 0)) - Number(item.discountAmount || 0)
+                        );
+
+                        return total + (item.discountType || Number(item.discountAmount || 0) > 0
+                            ? 0
+                            : itemNetAmount * this.vatRate);
+                    }, 0);
+
+                    return Math.round(vatAmount * 100) / 100;
                 },
               
      
@@ -1611,7 +1632,7 @@ await this.loadIngredients();
                                 analyticsHistory.unshift({
                                     orderId: this.currentReceiptOrderId,
                                     timestamp: new Date().toISOString(),
-                                    totalAmount: (this.selectedTable.bill || 0) * 1.05,
+                                    totalAmount: (this.selectedTable.bill || 0) + this.tableVatAmount(this.selectedTable),
                                     tableId: tableId,
                                     items: this.selectedTable.orders.map(item => ({
                                         name: item.name,

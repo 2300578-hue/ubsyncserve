@@ -205,10 +205,12 @@ class ProductController extends Controller
 
             $subtotalAmount = round((float) $orderItems->sum('line_total'), 2);
             $discountAmount = isset($data['discount_type'])
-                ? round($subtotalAmount * 0.20, 2)
+                ? round($subtotalAmount * config('sales.senior_pwd_discount_rate'), 2)
                 : 0.00;
             $discountedAmount = $subtotalAmount - $discountAmount;
-            $vatAmount = round($discountedAmount * 0.05, 2);
+            $vatAmount = isset($data['discount_type'])
+                ? 0.00
+                : round($discountedAmount * config('sales.vat_rate'), 2);
             $grandTotalAmount = round($discountedAmount + $vatAmount, 2);
 
             $tableNumber = $data['table_number'] ?? null;
@@ -237,13 +239,16 @@ class ProductController extends Controller
 
                 $existingOrders = json_decode($tableState->orders, true, flags: JSON_THROW_ON_ERROR);
                 $allocatedDiscount = 0.00;
+                $allocatedVat = 0.00;
                 $lastOrderItemIndex = $orderItems->count() - 1;
                 $newTableOrders = $orderItems->values()->map(function (array $item, int $index) use (
                     $data,
                     $discountAmount,
                     $subtotalAmount,
+                    $vatAmount,
                     $lastOrderItemIndex,
-                    &$allocatedDiscount
+                    &$allocatedDiscount,
+                    &$allocatedVat
                 ): array {
                     $itemDiscount = 0.00;
                     if (isset($data['discount_type'])) {
@@ -259,6 +264,18 @@ class ProductController extends Controller
                         $allocatedDiscount += $itemDiscount;
                     }
 
+                    $itemNetAmount = max(0, round($item['line_total'] - $itemDiscount, 2));
+                    $itemVat = 0.00;
+                    if (! isset($data['discount_type'])) {
+                        $remainingVat = max(0, round($vatAmount - $allocatedVat, 2));
+                        $itemVat = $index === $lastOrderItemIndex
+                            ? $remainingVat
+                            : ($subtotalAmount > 0
+                                ? min($remainingVat, round($itemNetAmount * $vatAmount / $subtotalAmount, 2))
+                                : 0.00);
+                        $allocatedVat += $itemVat;
+                    }
+
                     return [
                         'name' => $item['product_name'],
                         'qty' => $item['quantity'],
@@ -266,6 +283,7 @@ class ProductController extends Controller
                         'addonName' => collect($item['add_ons'])->pluck('name')->implode(', ') ?: 'default',
                         'discountType' => $data['discount_type'] ?? null,
                         'discountAmount' => $itemDiscount,
+                        'vatAmount' => $itemVat,
                     ];
                 });
                 $adults = $data['adults'] ?? (int) $tableState->adults;

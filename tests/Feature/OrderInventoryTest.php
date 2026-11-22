@@ -56,11 +56,11 @@ test('waiter orders are saved and decrement product stock', function () {
     ]);
 
     $response->assertCreated()
-        ->assertJsonPath('total_amount', 241.5)
+        ->assertJsonPath('total_amount', 257.6)
         ->assertJsonPath('subtotal_amount', 230)
         ->assertJsonPath('discount_amount', 0)
-        ->assertJsonPath('vat_amount', 11.5)
-        ->assertJsonPath('grand_total_amount', 241.5);
+        ->assertJsonPath('vat_amount', 27.6)
+        ->assertJsonPath('grand_total_amount', 257.6);
 
     $this->assertDatabaseHas('products', [
         'id' => $product->id,
@@ -69,7 +69,7 @@ test('waiter orders are saved and decrement product stock', function () {
     $this->assertDatabaseHas('orders', [
         'order_number' => $response->json('order_number'),
         'table_number' => '4',
-        'total_amount' => 241.5,
+        'total_amount' => 257.6,
     ]);
     $this->assertDatabaseHas('order_items', [
         'product_id' => $product->id,
@@ -90,7 +90,29 @@ test('waiter orders are saved and decrement product stock', function () {
             'qty' => 2,
             'price' => 115,
             'addonName' => 'Cheese',
+            'discountType' => null,
+            'discountAmount' => 0,
+            'vatAmount' => 27.6,
         ]]);
+});
+
+test('regular orders add twelve percent VAT to the subtotal', function () {
+    $product = Product::create([
+        'name' => 'Family Meal',
+        'category' => 'Lunch',
+        'selling_price' => 250,
+        'stock_quantity' => 2,
+    ]);
+
+    $response = $this->postJson(route('orders.complete'), [
+        'table_number' => 5,
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('subtotal_amount', 250)
+        ->assertJsonPath('vat_amount', 30)
+        ->assertJsonPath('total_amount', 280);
 });
 
 test('a manager-added table above the old limit accepts orders', function () {
@@ -388,13 +410,13 @@ test('senior and pwd discounts apply immediately without an ID number', function
     $response->assertCreated()
         ->assertJsonPath('subtotal_amount', 100)
         ->assertJsonPath('discount_amount', 20)
-        ->assertJsonPath('vat_amount', 4)
-        ->assertJsonPath('grand_total_amount', 84)
-        ->assertJsonPath('total_amount', 84);
+        ->assertJsonPath('vat_amount', 0)
+        ->assertJsonPath('grand_total_amount', 80)
+        ->assertJsonPath('total_amount', 80);
 
     $this->assertDatabaseHas('orders', [
         'order_number' => $response->json('order_number'),
-        'total_amount' => 84,
+        'total_amount' => 80,
     ]);
 
     $this->assertDatabaseHas('restaurant_tables', [

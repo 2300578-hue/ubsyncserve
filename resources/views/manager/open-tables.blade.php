@@ -191,12 +191,12 @@
                         <span class="text-sm font-bold text-emerald-700 tracking-tight" x-text="'−' + formatCurrency(selectedDiscountSummary().amount)"></span>
                     </div>
                     <div class="flex justify-between items-center pb-3 border-b border-dashed border-slate-300 mb-3">
-                        <span class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">VAT (5%)</span>
-                        <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 0.05)"></span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">VAT (12%)</span>
+                        <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency(tableVatAmount())"></span>
                     </div>
                     <div class="flex justify-between items-center pt-2">
                         <span class="text-xl font-black text-slate-800 uppercase tracking-wider">Total</span>
-                        <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 1.05)"></span>
+                        <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) + tableVatAmount())"></span>
                     </div>
                 </div>
 
@@ -363,12 +363,12 @@
                         <span class="text-sm font-bold text-emerald-700 tracking-tight" x-text="'−' + formatCurrency(selectedDiscountSummary().amount)"></span>
                     </div>
                     <div class="flex justify-between items-center pb-3 border-b border-dashed border-orange-200 mb-3">
-                        <span class="text-xs font-bold text-orange-800 uppercase tracking-[0.2em]">VAT (5%)</span>
-                        <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 0.05)"></span>
+                        <span class="text-xs font-bold text-orange-800 uppercase tracking-[0.2em]">VAT (12%)</span>
+                        <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency(tableVatAmount())"></span>
                     </div>
                     <div class="flex justify-between items-center pt-2">
                         <span class="text-xl font-black text-orange-950 uppercase tracking-wider">Total</span>
-                        <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 1.05)"></span>
+                        <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) + tableVatAmount())"></span>
                     </div>
                 </div>
 
@@ -459,12 +459,12 @@
                             <span x-text="'−' + formatCurrency(selectedDiscountSummary().amount)"></span>
                         </div>
                         <div class="flex justify-between font-bold text-xs text-black mb-2">
-                            <span>VAT (5%):</span>
-                            <span x-text="formatCurrency((selectedTable?.bill || 0) * 0.05)"></span>
+                            <span>VAT (12%):</span>
+                            <span x-text="formatCurrency(tableVatAmount())"></span>
                         </div>
                         <div class="flex justify-between font-black text-sm text-black pt-2 border-t-2 border-dashed border-black">
                             <span>TOTAL:</span>
-                            <span x-text="formatCurrency((selectedTable?.bill || 0) * 1.05)"></span>
+                            <span x-text="formatCurrency((selectedTable?.bill || 0) + tableVatAmount())"></span>
                         </div>
                     </div>
 

@@ -100,10 +100,10 @@ test('closing sales saves exact earnings and starting again resets only the live
         ->assertSuccessful()
         ->assertJsonPath('summary.order_count', 1)
         ->assertJsonPath('summary.items_sold', 2)
-        ->assertJsonPath('summary.total_sales', 210)
+        ->assertJsonPath('summary.total_sales', 224)
         ->assertJsonPath('summary.gross_sales', 200)
-        ->assertJsonPath('summary.vat_total', 10)
-        ->assertJsonPath('summary.cash_sales', 210)
+        ->assertJsonPath('summary.vat_total', 24)
+        ->assertJsonPath('summary.cash_sales', 224)
         ->assertJsonPath('products.0.name', 'Beef Tapa')
         ->assertJsonPath('products.0.qtySold', 2)
         ->assertJsonPath('products.0.totalRevenue', 200);
@@ -111,8 +111,8 @@ test('closing sales saves exact earnings and starting again resets only the live
     $this->postJson(route('manager.api.sales-shift.close'))
         ->assertSuccessful()
         ->assertJsonPath('shift.status', 'closed')
-        ->assertJsonPath('summary.total_sales', 210)
-        ->assertJsonPath('summary.expected_cash_drawer', 1210);
+        ->assertJsonPath('summary.total_sales', 224)
+        ->assertJsonPath('summary.expected_cash_drawer', 1224);
 
     $this->postJson(route('manager.api.sales-shift.start'), ['opening_float' => 0])->assertCreated();
 
@@ -122,16 +122,16 @@ test('closing sales saves exact earnings and starting again resets only the live
         ->assertJsonPath('current_shift.opening_float', '0.00')
         ->assertJsonPath('summary.order_count', 1)
         ->assertJsonPath('summary.items_sold', 2)
-        ->assertJsonPath('summary.total_sales', 210)
-        ->assertJsonPath('daily_reports.1.summary.expected_cash_drawer', 1210)
+        ->assertJsonPath('summary.total_sales', 224)
+        ->assertJsonPath('daily_reports.1.summary.expected_cash_drawer', 1224)
         ->assertJsonPath('products.0.name', 'Beef Tapa')
         ->assertJsonCount(1, 'products');
 
     $this->assertDatabaseCount('sales_shifts', 2);
     $this->assertDatabaseHas('sales_shifts', [
         'status' => 'closed',
-        'total_sales' => 210,
-        'cash_sales' => 210,
+        'total_sales' => 224,
+        'cash_sales' => 224,
         'order_count' => 1,
         'items_sold' => 2,
     ]);
@@ -180,7 +180,7 @@ test('paid customer advance orders appear in performance analytics', function ()
         ->assertJsonCount(1, 'daily_reports')
         ->assertJsonPath('daily_reports.0.summary.order_count', 1)
         ->assertJsonPath('summary.order_count', 1)
-        ->assertJsonPath('summary.total_sales', 210)
+        ->assertJsonPath('summary.total_sales', 224)
         ->assertJsonPath('products.0.name', 'Advance Order Meal')
         ->assertJsonPath('products.0.qtySold', 2)
         ->assertJsonPath('transactions.0.orderId', $order->json('order_number'))
@@ -237,9 +237,9 @@ test('a table can be settled without selecting a payment method', function () {
 
     $this->getJson(route('manager.api.sales-shift.show'))
         ->assertSuccessful()
-        ->assertJsonPath('summary.cash_sales', 42)
+        ->assertJsonPath('summary.cash_sales', 44.8)
         ->assertJsonPath('summary.gcash_sales', 0)
-        ->assertJsonPath('summary.total_sales', 42);
+        ->assertJsonPath('summary.total_sales', 44.8);
 });
 
 test('only managers can use sales shift controls', function () {

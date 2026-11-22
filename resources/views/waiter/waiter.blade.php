@@ -380,12 +380,12 @@
                     <span class="text-sm font-bold text-emerald-700 tracking-tight" x-text="'−' + formatCurrency(selectedDiscountSummary().amount)"></span>
                 </div>
                 <div class="flex justify-between items-center pb-3 border-b border-dashed border-slate-300 mb-3">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">VAT (5%)</span>
-                    <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 0.05)"></span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">VAT (12%)</span>
+                    <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency(tableVatAmount())"></span>
                 </div>
                 <div class="flex justify-between items-center pt-2">
                     <span class="text-xl font-black text-slate-800 uppercase tracking-wider">Total</span>
-                    <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 1.05)"></span>
+                    <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) + tableVatAmount())"></span>
                 </div>
             </div>
 
@@ -540,12 +540,12 @@
                     <span class="text-sm font-bold text-emerald-700 tracking-tight" x-text="'−' + formatCurrency(selectedDiscountSummary().amount)"></span>
                 </div>
                 <div class="flex justify-between items-center pb-3 border-b border-dashed border-orange-200 mb-3">
-                    <span class="text-xs font-bold text-orange-800 uppercase tracking-[0.2em]">VAT (5%)</span>
-                    <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 0.05)"></span>
+                    <span class="text-xs font-bold text-orange-800 uppercase tracking-[0.2em]">VAT (12%)</span>
+                    <span class="text-sm font-bold text-slate-600 tracking-tight" x-text="formatCurrency(tableVatAmount())"></span>
                 </div>
                 <div class="flex justify-between items-center pt-2">
                     <span class="text-xl font-black text-orange-950 uppercase tracking-wider">Total</span>
-                    <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) * 1.05)"></span>
+                    <span class="text-3xl font-black text-[#800000] tracking-tight" x-text="formatCurrency((selectedTable?.bill || 0) + tableVatAmount())"></span>
                 </div>
             </div>
 
@@ -626,12 +626,12 @@
                         <span x-text="'−' + formatCurrency(selectedDiscountSummary().amount)"></span>
                     </div>
                     <div class="flex justify-between font-bold text-xs text-black mb-2">
-                        <span>VAT (5%):</span>
-                        <span x-text="formatCurrency((selectedTable?.bill || 0) * 0.05)"></span>
+                        <span>VAT (12%):</span>
+                        <span x-text="formatCurrency(tableVatAmount())"></span>
                     </div>
                     <div class="flex justify-between font-black text-sm text-black pt-2 border-t-2 border-dashed border-black">
                         <span>TOTAL:</span>
-                        <span x-text="formatCurrency((selectedTable?.bill || 0) * 1.05)"></span>
+                        <span x-text="formatCurrency((selectedTable?.bill || 0) + tableVatAmount())"></span>
                     </div>
                 </div>
 
@@ -726,16 +726,15 @@
                     <span class="text-sm font-semibold text-emerald-700" x-text="selectedDiscountSummary().label + ' discount (20%):'"></span>
                     <span class="text-sm font-bold text-emerald-700" x-text="'−' + formatCurrency(selectedDiscountSummary().amount)"></span>
                 </div>
-                <!-- VAT 5% -->
                 <div class="flex justify-between items-center">
-                    <span class="text-sm font-semibold text-slate-600">VAT (5%):</span>
-                    <span class="text-lg font-bold text-slate-900" x-text="formatCurrency((selectedTable?.bill || 0) * 0.05)"></span>
+                    <span class="text-sm font-semibold text-slate-600">VAT (12%):</span>
+                    <span class="text-lg font-bold text-slate-900" x-text="formatCurrency(tableVatAmount())"></span>
                 </div>
 
                 <!-- Total -->
                 <div class="border-t border-slate-200 pt-4 flex justify-between items-center">
                     <span class="text-sm font-bold text-slate-900 uppercase">Total:</span>
-                    <span class="text-2xl font-black text-[#800000]" x-text="formatCurrency((selectedTable?.bill || 0) + ((selectedTable?.bill || 0) * 0.05))"></span>
+                    <span class="text-2xl font-black text-[#800000]" x-text="formatCurrency((selectedTable?.bill || 0) + tableVatAmount())"></span>
                 </div>
             </div>
 
@@ -751,6 +750,7 @@
 <script>
 function waiterSystem() {
     return {
+        vatRate: @json(config('sales.vat_rate')),
         tab: 'home',
         sidebarOpen: window.innerWidth >= 768,
         showSetupModal: false,
@@ -942,6 +942,26 @@ async startSession() {
 
         selectedGrossSubtotal() {
             return Number(this.selectedTable?.bill || 0) + this.selectedDiscountSummary().amount;
+        },
+
+        tableVatAmount(table = this.selectedTable) {
+            const vatAmount = (table?.orders || []).reduce((total, item) => {
+                const storedVat = Number(item.vatAmount);
+                if (Number.isFinite(storedVat)) {
+                    return total + storedVat;
+                }
+
+                const itemNetAmount = Math.max(
+                    0,
+                    (Number(item.price || 0) * Number(item.qty || 0)) - Number(item.discountAmount || 0)
+                );
+
+                return total + (item.discountType || Number(item.discountAmount || 0) > 0
+                    ? 0
+                    : itemNetAmount * this.vatRate);
+            }, 0);
+
+            return Math.round(vatAmount * 100) / 100;
         },
 
         // --- RESERVATION FUNCTIONS ---
@@ -1232,7 +1252,7 @@ async startSession() {
                 const transaction = {
                     orderId,
                     timestamp: new Date().toLocaleTimeString(),
-                    totalAmount: (this.selectedTable.bill || 0) * 1.05,
+                    totalAmount: (this.selectedTable.bill || 0) + this.tableVatAmount(this.selectedTable),
                     tableId: tableId,
                     items: this.selectedTable.orders.map(item => ({
                         name: item.name,
@@ -1358,7 +1378,7 @@ async startSession() {
                         analyticsHistory.unshift({
                             orderId: this.currentReceiptOrderId,
                             timestamp: new Date().toISOString(),
-                            totalAmount: (table.bill || 0) * 1.05,
+                            totalAmount: (table.bill || 0) + this.tableVatAmount(table),
                             tableId,
                             items: orderItems.map(item => ({
                                 name: item.name,

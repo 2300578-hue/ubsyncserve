@@ -169,7 +169,7 @@ if (bridge) {
         }
 
         lines.push(
-            fitColumns('VAT (5%):', formatPeso(payload.vat_amount), 42),
+            fitColumns('VAT (12%):', formatPeso(payload.vat_amount), 42),
             fitColumns('TOTAL:', formatPeso(payload.total_amount), 42),
             '-'.repeat(42),
             '',

@@ -101,12 +101,12 @@
                                 <span x-text="formatCurrency(cartTotal)"></span>
                             </div>
                             <div class="flex justify-between text-sm pt-2 font-bold text-gray-600 pb-2">
-                                <span>VAT (5%)</span>
-                                <span x-text="formatCurrency(cartTotal * 0.05)"></span>
+                                <span>VAT (12%)</span>
+                                <span x-text="formatCurrency(cartTotal * @json(config('sales.vat_rate')))"></span>
                             </div>
                             <div class="flex justify-between text-xl pt-2 font-black text-gray-900">
                                 <span>Total</span>
-                                <span class="text-[#800000]" x-text="formatCurrency(cartTotal * 1.05)"></span>
+                                <span class="text-[#800000]" x-text="formatCurrency(cartTotal * (1 + @json(config('sales.vat_rate'))))"></span>
                             </div>
                         </div>
                     </div>
@@ -151,8 +151,8 @@
                         <div class="flex justify-between"><span class="text-sm text-gray-500">Table:</span> <span class="text-sm font-black text-gray-900" x-text="tableNumber ? 'TABLE ' + tableNumber : 'UNASSIGNED'"></span></div>
                         <div class="flex justify-between"><span class="text-sm text-gray-500">Method:</span> <span class="text-sm font-black text-gray-900" x-text="paymentMethodLabel + ' (pending confirmation)'"></span></div>
                         <div class="flex justify-between pb-2 border-b border-gray-200"><span class="text-sm text-gray-500">Subtotal:</span> <span class="text-sm font-black text-gray-900" x-text="formatCurrency(cartTotal)"></span></div>
-                        <div class="flex justify-between pb-2"><span class="text-sm text-gray-500">VAT (5%):</span> <span class="text-sm font-black text-gray-900" x-text="formatCurrency(cartTotal * 0.05)"></span></div>
-                        <div class="flex justify-between pt-2 border-t border-gray-200 mt-2"><span class="text-base font-bold text-gray-900">Order Total:</span> <span class="text-base font-black text-[#800000]" x-text="formatCurrency(cartTotal * 1.05)"></span></div>
+                        <div class="flex justify-between pb-2"><span class="text-sm text-gray-500">VAT (12%):</span> <span class="text-sm font-black text-gray-900" x-text="formatCurrency(cartTotal * @json(config('sales.vat_rate')))"></span></div>
+                        <div class="flex justify-between pt-2 border-t border-gray-200 mt-2"><span class="text-base font-bold text-gray-900">Order Total:</span> <span class="text-base font-black text-[#800000]" x-text="formatCurrency(cartTotal * (1 + @json(config('sales.vat_rate'))))"></span></div>
                     </div>
                 </div>
                 
@@ -322,7 +322,7 @@
                         }
                         localStorage.removeItem('customer_pending_table_selection');
                         this.serverSubtotal = Number(result.subtotal_amount);
-                        const subtotal = this.cartTotal;
+                        const subtotal = Number(result.subtotal_amount);
                         this.orderComplete = this.bookingType !== 'advance-order';
 
                         try {
@@ -331,8 +331,8 @@
                                 orderId: result.order_number,
                                 timestamp: new Date().toISOString(),
                                 subtotal,
-                                vat: subtotal * 0.05,
-                                totalAmount: subtotal * 1.05,
+                                vat: Number(result.vat_amount),
+                                totalAmount: Number(result.total_amount),
                                 tableId,
                                 paymentMethod: this.paymentMethod,
                                 bookingType: this.bookingType,

@@ -19,7 +19,7 @@
                 <div class="flex-1">
                     <p class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Sales</p>
                     <p class="text-3xl font-black text-[#800000]" x-text="formatCurrency(salesSummary.total)"></p>
-                    <p class="text-[10px] font-bold text-emerald-600 mt-1"><i class="fas fa-caret-up"></i> Incl. 5% VAT</p>
+                    <p class="text-[10px] font-bold text-emerald-600 mt-1"><i class="fas fa-caret-up"></i> Incl. 12% VAT</p>
                 </div>
             </div>
         </div>
