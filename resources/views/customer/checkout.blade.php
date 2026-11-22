@@ -208,7 +208,7 @@
                                 ? Number(submittedOrder.subtotal)
                                 : null;
                             this.guestCount = adults + children;
-                            if (submittedOrder.bookingType === 'advance-order' || savedBookingType === 'advance-order') {
+                            if (submittedOrder.bookingType === 'advance-order') {
                                 localStorage.setItem('customer_confirmation', JSON.stringify({
                                     status: 'submitted',
                                     type: 'advance-order',

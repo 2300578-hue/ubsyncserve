@@ -258,6 +258,16 @@
                 throw new Error(validationMessage || data.message || 'Unable to submit your reservation.');
             }
 
+            [
+                'customer_confirmation',
+                'customer_order_cart',
+                'customer_order_table',
+                'customer_pending_table_selection',
+                'customer_guests_adults',
+                'customer_guests_children',
+                'customer_payment_method',
+                'customer_last_submitted_order'
+            ].forEach(key => localStorage.removeItem(key));
             localStorage.setItem('customer_booking_type', type);
             window.dispatchEvent(new Event('storage'));
             this.reset();

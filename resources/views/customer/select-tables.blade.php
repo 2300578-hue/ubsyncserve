@@ -152,19 +152,24 @@
                 async init() {
                     const params = new URLSearchParams(window.location.search);
                     this.bookingType = params.get('type') || localStorage.getItem('customer_booking_type') || 'advance-order';
+                    this.reservationId = params.get('resId');
                     let submittedOrder = null;
                     try {
                         submittedOrder = JSON.parse(localStorage.getItem('customer_last_submitted_order') || 'null');
                     } catch (error) {
                         localStorage.removeItem('customer_last_submitted_order');
                     }
-                    if (submittedOrder?.status === 'submitted' && submittedOrder.tableId) {
+                    if (
+                        !this.reservationId
+                        && this.bookingType === 'advance-order'
+                        && submittedOrder?.status === 'submitted'
+                        && submittedOrder.tableId
+                    ) {
                         window.location.replace(`{{ route('order.checkout') }}`);
                         return;
                     }
 
                     await this.loadTables();
-                    this.reservationId = params.get('resId');
                     if (this.reservationId) {
                         const reservationLoaded = await this.loadReservationDetails();
                         if (!reservationLoaded) {
@@ -179,7 +184,8 @@
                         localStorage.removeItem('customer_pending_table_selection');
                     }
                     if (
-                        pendingSelection?.bookingType === 'advance-order'
+                        !this.reservationId
+                        && pendingSelection?.bookingType === 'advance-order'
                         && pendingSelection.tableId
                         && this.bookingType === 'advance-order'
                     ) {
