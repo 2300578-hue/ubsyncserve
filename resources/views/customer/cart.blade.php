@@ -290,6 +290,9 @@
 
                 gotoCheckout() {
                     if (this.cart.length === 0) return;
+                    localStorage.removeItem('customer_last_submitted_order');
+                    localStorage.removeItem('customer_confirmation');
+                    localStorage.removeItem('customer_pending_table_selection');
                     window.location.href = "{{ route('order.checkout') }}";
                 }
             };

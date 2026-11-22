@@ -200,36 +200,6 @@
                     let adults = Number.isInteger(savedAdults) ? savedAdults : 0;
                     let children = Number.isInteger(savedChildren) ? savedChildren : 0;
 
-                    try {
-                        const submittedOrder = JSON.parse(localStorage.getItem('customer_last_submitted_order') || 'null');
-                        if (submittedOrder?.status === 'submitted' && submittedOrder.tableId) {
-                            this.tableNumber = String(submittedOrder.tableId);
-                            this.serverSubtotal = Number.isFinite(Number(submittedOrder.subtotal))
-                                ? Number(submittedOrder.subtotal)
-                                : null;
-                            this.guestCount = adults + children;
-                            if (submittedOrder.bookingType === 'advance-order') {
-                                localStorage.setItem('customer_confirmation', JSON.stringify({
-                                    status: 'submitted',
-                                    type: 'advance-order',
-                                    tableId: Number(submittedOrder.tableId),
-                                    orderNumber: submittedOrder.orderNumber || null,
-                                    subtotal: Number(submittedOrder.subtotal) || 0,
-                                    total: Number(submittedOrder.total) || 0,
-                                    paymentStatus: submittedOrder.paymentStatus || 'pending',
-                                    paymentMethod: submittedOrder.paymentMethod || 'gcash'
-                                }));
-                                window.location.replace("{{ route('customer.confirmation', ['type' => 'advance-order']) }}");
-                                return;
-                            }
-
-                            this.orderComplete = true;
-                            return;
-                        }
-                    } catch (error) {
-                        localStorage.removeItem('customer_last_submitted_order');
-                    }
-
                     if (adults === 0 && children === 0 && this.tableNumber) {
                         const storedTables = await window.tableStateApi.load();
                         const tableData = storedTables.find(t => t.id === Number(this.tableNumber));
