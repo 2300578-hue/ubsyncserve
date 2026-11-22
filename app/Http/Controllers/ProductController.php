@@ -77,6 +77,8 @@ class ProductController extends Controller
             abort(503, 'Sales reporting database is not set up. Run php artisan migrate, then reload this page.');
         }
 
+        $autoPayLocalAdvanceOrder = config('app.env') === 'local'
+            && ($data['booking_type'] ?? null) === 'advance-order';
         $idempotencyKey = $data['idempotency_key'] ?? null;
         $shouldQueueOrderSlip = in_array(Auth::user()?->role, ['manager', 'waiter'], true);
         if ($idempotencyKey !== null) {
@@ -92,6 +94,7 @@ class ProductController extends Controller
 
         $result = DB::transaction(function () use (
             $data,
+            $autoPayLocalAdvanceOrder,
             $hasBookingTypeColumn,
             $idempotencyKey,
             $printJobs,
@@ -284,8 +287,8 @@ class ProductController extends Controller
                 DB::table('restaurant_tables')
                     ->where('table_number', $tableNumber)
                     ->update([
-                        'status' => $tableStatus,
-                        'is_paid' => false,
+                        'status' => $autoPayLocalAdvanceOrder ? 'paid' : $tableStatus,
+                        'is_paid' => $autoPayLocalAdvanceOrder,
                         'adults' => $adults,
                         'children' => $children,
                         'guests' => $adults + $children,
@@ -303,8 +306,9 @@ class ProductController extends Controller
                 ...($hasBookingTypeColumn ? ['booking_type' => $data['booking_type'] ?? null] : []),
                 'waiter_id' => Auth::id(),
                 'sales_shift_id' => $salesShift->id,
-                'status' => 'pending',
+                'status' => $autoPayLocalAdvanceOrder ? 'completed' : 'pending',
                 'payment_method' => $data['payment_method'] ?? null,
+                'paid_at' => $autoPayLocalAdvanceOrder ? now() : null,
                 'total_amount' => $grandTotalAmount,
                 'subtotal_amount' => $subtotalAmount,
                 'discount_amount' => $discountAmount,
@@ -347,6 +351,7 @@ class ProductController extends Controller
             'discount_amount' => (float) $order->discount_amount,
             'vat_amount' => (float) $order->vat_amount,
             'grand_total_amount' => (float) $order->total_amount,
+            'payment_status' => $order->paid_at !== null ? 'paid' : 'pending',
         ];
     }
 

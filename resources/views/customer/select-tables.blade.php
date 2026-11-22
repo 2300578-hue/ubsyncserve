@@ -103,7 +103,7 @@
 
                 <div class="flex gap-2 sm:gap-3">
                     <button @click="cancelReservation()" class="flex-1 bg-gray-200 text-gray-700 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold uppercase text-xs sm:text-sm transition-all">Cancel</button>
-                    <button @click="confirmReservation()" class="flex-1 bg-[#800000] text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold uppercase text-xs sm:text-sm transition-all hover:bg-red-900">Confirm</button>
+                    <button @click="confirmReservation()" :disabled="isConfirmingReservation" class="flex-1 bg-[#800000] text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold uppercase text-xs sm:text-sm transition-all hover:bg-red-900 disabled:cursor-wait disabled:opacity-60" x-text="isConfirmingReservation ? 'Please wait...' : 'Confirm'"></button>
                 </div>
             </div>
         </div>
@@ -141,6 +141,7 @@
                 bookingType: 'advance-order',
                 showConfirmModal: false,
                 showDetailsModal: false,
+                isConfirmingReservation: false,
                 selectedTable: null,
                 currentReservation: null,
                 reservationId: null,
@@ -293,41 +294,54 @@
                 },
 
                 async confirmReservation() {
-                    if (!this.selectedTable) {
+                    if (!this.selectedTable || this.isConfirmingReservation) {
                         return;
                     }
 
-                    const storedTables = await window.tableStateApi.load();
-                    const tableIndex = storedTables.findIndex(t => t.id === this.selectedTable.id);
-                    if (tableIndex === -1 || storedTables[tableIndex].status !== 'available') {
-                        alert('This table is no longer available. Please choose another table.');
-                        await this.loadTables();
-                        return;
-                    }
+                    this.isConfirmingReservation = true;
+                    this.tableLoadError = '';
+                    try {
+                        const storedTables = await window.tableStateApi.load();
+                        const tableIndex = storedTables.findIndex(t => t.id === this.selectedTable.id);
+                        if (tableIndex === -1 || storedTables[tableIndex].status !== 'available') {
+                            this.tableLoadError = 'This table is no longer available. Please choose another table.';
+                            await this.loadTables();
+                            return;
+                        }
 
-                    const selectedTable = storedTables[tableIndex];
-                    if (this.bookingType === 'advance-order') {
-                        const adults = Number(this.currentReservation?.adults || 0);
-                        const children = Number(this.currentReservation?.children || 0);
-                        localStorage.setItem('customer_order_table', String(selectedTable.id));
-                        localStorage.setItem('customer_guests_adults', String(adults));
-                        localStorage.setItem('customer_guests_children', String(children));
-                        localStorage.setItem('customer_booking_type', 'advance-order');
-                        localStorage.setItem('customer_pending_table_selection', JSON.stringify({
-                            tableId: selectedTable.id,
-                            bookingType: 'advance-order'
-                        }));
-                        window.location.href = `{{ route('order.menu') }}?table=` + this.selectedTable.id;
-                    } else {
+                        const selectedTable = storedTables[tableIndex];
+                        if (this.bookingType === 'advance-order') {
+                            const adults = Number(this.currentReservation?.adults || 0);
+                            const children = Number(this.currentReservation?.children || 0);
+                            localStorage.setItem('customer_order_table', String(selectedTable.id));
+                            localStorage.setItem('customer_guests_adults', String(adults));
+                            localStorage.setItem('customer_guests_children', String(children));
+                            localStorage.setItem('customer_booking_type', 'advance-order');
+                            localStorage.setItem('customer_pending_table_selection', JSON.stringify({
+                                tableId: selectedTable.id,
+                                bookingType: 'advance-order'
+                            }));
+                            window.location.href = `{{ route('order.menu') }}?table=` + selectedTable.id;
+                            return;
+                        }
+
                         selectedTable.status = 'reserved-booking';
                         selectedTable.adults = Number(this.currentReservation?.adults || 0);
                         selectedTable.children = Number(this.currentReservation?.children || 0);
                         selectedTable.guests = selectedTable.adults + selectedTable.children;
                         await window.tableStateApi.save([selectedTable]);
-                        await this.loadTables();
+                        localStorage.setItem('customer_confirmation', JSON.stringify({
+                            status: 'confirmed',
+                            type: 'table-reservation',
+                            tableId: selectedTable.id,
+                            guests: selectedTable.guests
+                        }));
+                        window.location.href = "{{ route('customer.confirmation', ['type' => 'table-reservation']) }}";
+                    } catch (error) {
+                        this.tableLoadError = error.message || 'Unable to reserve this table. Please try again.';
+                    } finally {
+                        this.isConfirmingReservation = false;
                     }
-                    this.showConfirmModal = false;
-                    this.selectedTable = null;
                 },
 
                 cancelReservation() {

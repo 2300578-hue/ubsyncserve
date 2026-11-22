@@ -208,6 +208,21 @@
                                 ? Number(submittedOrder.subtotal)
                                 : null;
                             this.guestCount = adults + children;
+                            if (submittedOrder.bookingType === 'advance-order' || savedBookingType === 'advance-order') {
+                                localStorage.setItem('customer_confirmation', JSON.stringify({
+                                    status: 'submitted',
+                                    type: 'advance-order',
+                                    tableId: Number(submittedOrder.tableId),
+                                    orderNumber: submittedOrder.orderNumber || null,
+                                    subtotal: Number(submittedOrder.subtotal) || 0,
+                                    total: Number(submittedOrder.total) || 0,
+                                    paymentStatus: submittedOrder.paymentStatus || 'pending',
+                                    paymentMethod: submittedOrder.paymentMethod || 'gcash'
+                                }));
+                                window.location.replace("{{ route('customer.confirmation', ['type' => 'advance-order']) }}");
+                                return;
+                            }
+
                             this.orderComplete = true;
                             return;
                         }
@@ -318,12 +333,27 @@
                             tableId,
                             orderNumber: result.order_number,
                             paymentMethod: this.paymentMethod,
-                            subtotal: Number(result.subtotal_amount)
+                            subtotal: Number(result.subtotal_amount),
+                            total: Number(result.grand_total_amount ?? result.total_amount),
+                            paymentStatus: result.payment_status || 'pending',
+                            bookingType: this.bookingType
                         }));
+                        if (this.bookingType === 'advance-order') {
+                            localStorage.setItem('customer_confirmation', JSON.stringify({
+                                status: 'submitted',
+                                type: 'advance-order',
+                                tableId,
+                                orderNumber: result.order_number,
+                                paymentMethod: this.paymentMethod,
+                                subtotal: Number(result.subtotal_amount),
+                                total: Number(result.grand_total_amount ?? result.total_amount),
+                                paymentStatus: result.payment_status || 'pending'
+                            }));
+                        }
                         localStorage.removeItem('customer_pending_table_selection');
                         this.serverSubtotal = Number(result.subtotal_amount);
                         const subtotal = this.cartTotal;
-                        this.orderComplete = true;
+                        this.orderComplete = this.bookingType !== 'advance-order';
 
                         try {
                             const analyticsHistory = JSON.parse(localStorage.getItem('ub_order_history') || '[]');
@@ -344,6 +374,9 @@
                         } catch (error) {
                             console.error('Unable to save the local checkout analytics entry:', error);
                         }
+                        if (this.bookingType === 'advance-order') {
+                            window.location.href = "{{ route('customer.confirmation', ['type' => 'advance-order']) }}";
+                        }
                     } catch (error) {
                         this.orderError = error.message || 'Unable to submit your order. Please try again.';
                     } finally {
@@ -360,6 +393,7 @@
                     localStorage.removeItem('customer_booking_type');
                     localStorage.removeItem('customer_payment_method');
                     localStorage.removeItem('customer_last_submitted_order');
+                    localStorage.removeItem('customer_confirmation');
                     window.location.href = "{{ route('order.qrcodes') }}";
                 }
             };

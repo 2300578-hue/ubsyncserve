@@ -261,7 +261,8 @@ test('advance order reserves its table only when the order is submitted and gues
         'adults' => 2,
         'children' => 1,
         'items' => [['product_id' => $product->id, 'quantity' => 1]],
-    ])->assertCreated();
+    ])->assertCreated()
+        ->assertJsonPath('payment_status', 'pending');
 
     $this->assertDatabaseHas('restaurant_tables', [
         'table_number' => 2,
@@ -285,6 +286,36 @@ test('advance order reserves its table only when the order is submitted and gues
         'status' => 'pending',
     ]);
     $this->assertDatabaseCount('orders', 1);
+});
+
+test('advance orders are marked paid automatically in the local environment', function () {
+    config(['app.env' => 'local']);
+
+    $product = Product::create([
+        'name' => 'Local Test Meal',
+        'selling_price' => 100,
+        'stock_quantity' => 2,
+    ]);
+
+    $response = $this->postJson(route('orders.complete'), [
+        'table_number' => 5,
+        'booking_type' => 'advance-order',
+        'payment_method' => 'gcash',
+        'adults' => 2,
+        'items' => [['product_id' => $product->id, 'quantity' => 1]],
+    ])->assertCreated()
+        ->assertJsonPath('payment_status', 'paid');
+
+    $order = DB::table('orders')->where('order_number', $response->json('order_number'))->first();
+
+    expect($order->status)->toBe('completed')
+        ->and($order->paid_at)->not->toBeNull();
+
+    $this->assertDatabaseHas('restaurant_tables', [
+        'table_number' => 5,
+        'status' => 'paid',
+        'is_paid' => true,
+    ]);
 });
 
 test('advance order without guest details does not create an empty advance reservation', function () {
