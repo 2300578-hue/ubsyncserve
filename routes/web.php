@@ -201,9 +201,7 @@ Route::middleware('auth')->group(function () {
         ->name('customer.bookings.archive-all');
 });
 
-Route::get('/book', function () {
-    return view('customer.book');
-})->name('customer.book');
+Route::get('/book', [CustomerBookingController::class, 'create'])->name('customer.book');
 
 Route::middleware('auth')->post('/confirm', [ReservationEmailController::class, 'confirmEmail'])
     ->name('reservation.confirm.email');

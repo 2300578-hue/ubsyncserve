@@ -43,9 +43,15 @@
             </div>
         </div>
 
-        <form class="px-6 pt-12 pb-6 space-y-4" action="{{ route('customer.book.post') }}" method="POST">
+        <form class="px-6 pt-12 pb-6 space-y-4" action="{{ route('customer.book.post') }}" method="POST" data-sales-open="{{ $salesOpen ? 'true' : 'false' }}">
             @csrf
             <input type="hidden" name="type" value="table-reservation" id="bookingTypeInput">
+
+            @unless ($salesOpen)
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900" role="status">
+                    Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.
+                </div>
+            @endunless
 
             <div class="rounded-xl bg-[#fafafa] border border-gray-100 p-3.5 shadow-sm">
                 <p class="text-[10px] font-black uppercase tracking-[0.2em] text-[#800000] mb-1">Booking Type</p>
@@ -149,7 +155,8 @@
             </div>
 
             <button type="submit" id="submitBtn" disabled class="w-full mt-2 bg-[#6b0000] hover:bg-[#4d0000] disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed text-white font-black py-3 rounded-xl uppercase tracking-widest text-[11px] sm:text-xs transition-all shadow-md flex justify-center items-center gap-2">
-                <i class="fas fa-check-circle text-[#d4af37] text-sm disabled:text-gray-500"></i> COMPLETE RESERVATION
+                <i class="fas fa-check-circle text-[#d4af37] text-sm disabled:text-gray-500"></i>
+                <span id="submitLabel">{{ $salesOpen ? 'COMPLETE RESERVATION' : 'SALES ARE CURRENTLY CLOSED' }}</span>
             </button>
 
             <a href="{{ route('order.select-booking') }}" class="block text-center text-[#800000] hover:text-[#4d0000] font-bold text-[11px] uppercase tracking-widest transition-colors pt-3">
@@ -167,6 +174,7 @@
     }
 
     function validateForm() {
+        const salesOpen = document.querySelector('form').dataset.salesOpen === 'true';
         const name = document.querySelector('input[name="name"]').value.trim();
         const email = document.querySelector('input[name="email"]').value.trim();
         const phone = document.querySelector('input[name="phone"]').value.trim();
@@ -177,6 +185,7 @@
         const totalGuests = adults + children;
 
         const isValid =
+            salesOpen &&
             name.length > 0 &&
             /^[^@\s]+@gmail\.com$/i.test(email) &&
             phone.length > 0 &&
@@ -219,6 +228,10 @@
 
     document.querySelector('form').addEventListener('submit', async function(e) {
         e.preventDefault();
+        if (this.dataset.salesOpen !== 'true') {
+            alert('Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.');
+            return;
+        }
 
         const formData = new FormData(this);
         const adults = parseInt(formData.get('adults'), 10) || 0;
@@ -252,7 +265,7 @@
         } catch (error) {
             alert(error.message);
         } finally {
-            submitButton.disabled = false;
+            validateForm();
         }
     });
 </script>

@@ -1,11 +1,23 @@
 <?php
 
+use App\Models\SalesShift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    $manager = User::factory()->create(['role' => 'manager']);
+
+    SalesShift::query()->create([
+        'started_by' => $manager->id,
+        'business_date' => now('Asia/Manila')->toDateString(),
+        'started_at' => now(),
+        'status' => 'open',
+    ]);
+});
 
 test('table selection builds the reservation details URL from the named route', function () {
     $bookingDetailsUrl = route('customer.booking.table-details', [
@@ -15,6 +27,54 @@ test('table selection builds the reservation details URL from the named route', 
     $this->get(route('order.select-tables'))
         ->assertSuccessful()
         ->assertSee(str_replace('/', '\\/', $bookingDetailsUrl), false);
+});
+
+test('reservation form explains when sales are closed', function () {
+    SalesShift::query()->update(['status' => 'closed']);
+
+    $this->get(route('customer.book'))
+        ->assertSuccessful()
+        ->assertSee('Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.')
+        ->assertSee('data-sales-open="false"', false)
+        ->assertSee('SALES ARE CURRENTLY CLOSED');
+});
+
+test('customers cannot submit reservations while sales are closed', function (string $type) {
+    SalesShift::query()->update(['status' => 'closed']);
+
+    $this->postJson(route('customer.book.post'), [
+        'type' => $type,
+        'name' => 'Jane Doe',
+        'email' => 'jane.doe@gmail.com',
+        'phone' => '09123456789',
+        'date' => now()->addDay()->toDateString(),
+        'time' => '18:00',
+        'adults' => 2,
+        'children' => 0,
+    ])->assertConflict()
+        ->assertJsonPath('message', 'Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.');
+
+    $this->assertDatabaseCount('customer_bookings', 0);
+})->with([
+    'advance order' => 'advance-order',
+    'table reservation' => 'table-reservation',
+]);
+
+test('customers can submit both reservation types while sales are open', function () {
+    foreach (['advance-order', 'table-reservation'] as $type) {
+        $this->postJson(route('customer.book.post'), [
+            'type' => $type,
+            'name' => 'Jane Doe',
+            'email' => $type === 'advance-order' ? 'advance@gmail.com' : 'reservation@gmail.com',
+            'phone' => '09123456789',
+            'date' => now()->addDay()->toDateString(),
+            'time' => '18:00',
+            'adults' => 2,
+            'children' => 0,
+        ])->assertCreated();
+    }
+
+    $this->assertDatabaseCount('customer_bookings', 2);
 });
 
 test('reservation requests require a Gmail address', function () {

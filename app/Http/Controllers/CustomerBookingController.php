@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SalesSetting;
+use App\Models\SalesShift;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -9,9 +12,17 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class CustomerBookingController extends Controller
 {
+    public function create(): View
+    {
+        return view('customer.book', [
+            'salesOpen' => $this->hasOpenSalesShift(),
+        ]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $this->authorizeStaff($request);
@@ -86,29 +97,49 @@ class CustomerBookingController extends Controller
             ], 422);
         }
 
-        $normalizedEmail = $this->normalizeGmailAddress($validated['email']);
-        if ($normalizedEmail !== null && $this->hasConfirmedReservationEmail($normalizedEmail)) {
-            throw ValidationException::withMessages([
-                'email' => ['This Gmail account already has a confirmed reservation.'],
-            ]);
-        }
+        $booking = DB::transaction(function () use ($validated, $guests): int {
+            $settings = SalesSetting::current();
+            $settings = SalesSetting::query()->lockForUpdate()->findOrFail($settings->id);
+            $businessDate = CarbonImmutable::now('Asia/Manila');
 
-        $booking = DB::table('customer_bookings')->insertGetId([
-            'booking_reference' => 'RES-'.strtoupper(Str::random(8)),
-            'type' => $validated['type'],
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
-            'adults' => $validated['adults'],
-            'children' => $validated['children'],
-            'guests' => $guests,
-            'booking_date' => $validated['date'],
-            'booking_time' => $validated['time'],
-            'requests' => $validated['requests'] ?? null,
-            'status' => 'pending',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            if ($businessDate->format('H:i') < substr($settings->business_day_cutoff, 0, 5)) {
+                $businessDate = $businessDate->subDay();
+            }
+
+            $openShift = SalesShift::query()
+                ->where('status', 'open')
+                ->whereDate('business_date', $businessDate->toDateString())
+                ->lockForUpdate()
+                ->first();
+
+            if ($openShift === null) {
+                abort(409, 'Sales are currently closed. Ask the manager to start a sales shift before submitting a reservation.');
+            }
+
+            $normalizedEmail = $this->normalizeGmailAddress($validated['email']);
+            if ($normalizedEmail !== null && $this->hasConfirmedReservationEmail($normalizedEmail)) {
+                throw ValidationException::withMessages([
+                    'email' => ['This Gmail account already has a confirmed reservation.'],
+                ]);
+            }
+
+            return DB::table('customer_bookings')->insertGetId([
+                'booking_reference' => 'RES-'.strtoupper(Str::random(8)),
+                'type' => $validated['type'],
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'phone' => $validated['phone'],
+                'adults' => $validated['adults'],
+                'children' => $validated['children'],
+                'guests' => $guests,
+                'booking_date' => $validated['date'],
+                'booking_time' => $validated['time'],
+                'requests' => $validated['requests'] ?? null,
+                'status' => 'pending',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
 
         return response()->json([
             'message' => 'Reservation request submitted successfully. Please wait for confirmation.',
@@ -317,6 +348,21 @@ class CustomerBookingController extends Controller
             ->whereNull('archived_at')
             ->pluck('email')
             ->contains(fn (string $email): bool => $this->normalizeGmailAddress($email) === $normalizedEmail);
+    }
+
+    private function hasOpenSalesShift(): bool
+    {
+        $settings = SalesSetting::current();
+        $businessDate = CarbonImmutable::now('Asia/Manila');
+
+        if ($businessDate->format('H:i') < substr($settings->business_day_cutoff, 0, 5)) {
+            $businessDate = $businessDate->subDay();
+        }
+
+        return SalesShift::query()
+            ->where('status', 'open')
+            ->whereDate('business_date', $businessDate->toDateString())
+            ->exists();
     }
 
     private function authorizeStaff(Request $request): void
