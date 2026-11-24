@@ -24,32 +24,39 @@
     <main
         x-data="reservationConfirmation()"
         x-init="init()"
-        x-cloak
         data-confirmation-type="{{ $type }}"
         data-select-booking-url="{{ route('order.select-booking') }}"
         data-home-url="{{ route('order.qrcodes') }}"
         class="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 sm:px-8">
-        <section class="relative w-full max-w-5xl overflow-hidden rounded-[1.75rem] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.12)]">
-            <div class="h-2.5 bg-[#800000]"></div>
-            <div class="px-6 py-12 text-center sm:px-12 sm:py-14">
-                <div class="mx-auto mb-7 flex h-20 w-20 items-center justify-center rounded-full bg-[#12bfa3] shadow-[0_10px_28px_rgba(18,191,163,0.22)]">
+        <section class="relative w-full max-w-4xl overflow-hidden rounded-[1.5rem] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
+            <div class="h-2.5 bg-[#19bf9a]"></div>
+            <div class="px-6 py-10 text-center sm:px-12 sm:py-14">
+                <div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[linear-gradient(135deg,#20c5a4,#11a987)] shadow-[0_10px_28px_rgba(18,191,163,0.24)]">
                     <i class="fas fa-check text-4xl text-white" aria-hidden="true"></i>
                 </div>
 
-                <p class="mb-4 text-sm font-black uppercase tracking-[0.32em] text-[#009b89]"
-                    x-text="type === 'order' ? 'Order received' : 'Successfully received'"></p>
-                <h1 class="mx-auto max-w-4xl text-3xl font-black leading-[1.08] tracking-[-0.035em] text-[#17215a] sm:text-5xl"
-                    x-text="type === 'order' ? 'Thank You! Your Order is Confirmed.' : 'Thank You! Your Reservation is Confirmed.'"></h1>
-                <p class="mx-auto mt-5 max-w-xl text-sm leading-6 text-slate-400 sm:text-base"
-                    x-text="type === 'table-reservation'
-                        ? `We have received your reservation and secured Table ${confirmation?.tableId}. We look forward to serving you!`
-                        : type === 'order'
-                            ? confirmation?.paymentStatus === 'paid'
-                                ? `Order ${confirmation?.orderNumber} has been received and its payment is confirmed. We look forward to serving you!`
-                                : `Order ${confirmation?.orderNumber} has been received for Table ${confirmation?.tableId}. GCash confirmation is pending with staff.`
-                        : confirmation?.paymentStatus === 'paid'
+                @if ($type === 'order')
+                    <p class="mb-4 text-sm font-black uppercase tracking-[0.32em] text-[#009b89]">Order received</p>
+                    <h1 class="mx-auto max-w-3xl text-3xl font-black leading-[1.12] tracking-[-0.035em] text-[#17215a] sm:text-5xl">Thank You! Your Order is Confirmed.</h1>
+                    <p class="mx-auto mt-5 max-w-xl text-sm leading-6 text-slate-500 sm:text-base"
+                        x-text="confirmation?.paymentStatus === 'paid'
+                            ? `Order ${confirmation?.orderNumber || ''} has been received and its payment is confirmed. We look forward to serving you!`
+                            : `We have received your order. GCash confirmation is pending with staff. We look forward to serving you!`">We have received your order. GCash confirmation is pending with staff. We look forward to serving you!</p>
+                @elseif ($type === 'table-reservation')
+                    <p class="mb-4 text-sm font-black uppercase tracking-[0.32em] text-[#009b89]">Successfully received</p>
+                    <h1 class="mx-auto max-w-3xl text-3xl font-black leading-[1.12] tracking-[-0.035em] text-[#17215a] sm:text-5xl">Thank You! Your Reservation is Confirmed.</h1>
+                    <p class="mx-auto mt-5 max-w-xl text-sm leading-6 text-slate-500 sm:text-base"
+                        x-text="confirmation?.tableId
+                            ? `We have received your reservation and secured Table ${confirmation.tableId}. We look forward to serving you!`
+                            : 'We have received your reservation and secured your table. We look forward to serving you!'">We have received your reservation and secured your table. We look forward to serving you!</p>
+                @else
+                    <p class="mb-4 text-sm font-black uppercase tracking-[0.32em] text-[#009b89]">Successfully received</p>
+                    <h1 class="mx-auto max-w-3xl text-3xl font-black leading-[1.12] tracking-[-0.035em] text-[#17215a] sm:text-5xl">Thank You! Your Advance Order is Confirmed.</h1>
+                    <p class="mx-auto mt-5 max-w-xl text-sm leading-6 text-slate-500 sm:text-base"
+                        x-text="confirmation?.paymentStatus === 'paid'
                             ? 'We have received your payment and locked in your table schedule. We look forward to serving you!'
-                            : `We have received your advance order and secured Table ${confirmation?.tableId}. GCash payment is pending staff confirmation; online payment processing is not configured yet.`"></p>
+                            : 'We have received your advance order and secured your table. GCash payment is pending staff confirmation.'">We have received your advance order and secured your table. GCash payment is pending staff confirmation.</p>
+                @endif
             </div>
         </section>
     </main>

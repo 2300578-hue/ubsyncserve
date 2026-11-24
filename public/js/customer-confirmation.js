@@ -9,21 +9,6 @@ function reservationConfirmation() {
             } catch (error) {
                 localStorage.removeItem('customer_confirmation');
             }
-
-            const expectedStatus = this.type === 'table-reservation' ? 'confirmed' : 'submitted';
-            if (
-                !this.confirmation
-                || this.confirmation.type !== this.type
-                || this.confirmation.status !== expectedStatus
-                || !Number.isInteger(Number(this.confirmation.tableId))
-                || Number(this.confirmation.tableId) < 1
-            ) {
-                this.clearCustomerFlowState();
-                window.location.replace(document.querySelector('[data-confirmation-type]').dataset.selectBookingUrl);
-                return;
-            }
-
-            this.clearCustomerFlowState();
         },
 
         clearCustomerFlowState() {
