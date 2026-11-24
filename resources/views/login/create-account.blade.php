@@ -97,6 +97,11 @@
 </head>
 <body>
     <div class="login-box" x-data="createAccountForm()" x-cloak>
+        <button x-show="mode === 'verify'" type="button" @click="backToRegistration" :disabled="isLoading" class="mb-4 inline-flex items-center gap-2 text-[12px] font-semibold text-gray-600 hover:text-[#800000] transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span aria-hidden="true">&larr;</span>
+            Back to registration
+        </button>
+
         <div class="text-center mb-8">
             <img src="{{ asset('img/ublogo.png') }}" alt="UB Logo" class="w-48 sm:w-70 h-auto mx-auto mb-1">
             <p class="text-black-500 text-sm font-medium" x-text="mode === 'register' ? 'Create your account' : 'Verify your email'"></p>
@@ -160,11 +165,6 @@
 
         <template x-if="mode === 'verify'">
             <form @submit.prevent="verifyCode" class="space-y-4">
-                <button type="button" @click="backToRegistration" :disabled="isLoading" class="inline-flex items-center gap-2 text-[12px] font-semibold text-gray-600 hover:text-[#800000] transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <span aria-hidden="true">&larr;</span>
-                    Back to registration
-                </button>
-
                 <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-[12px]">
                     We sent a 6-digit verification code to <strong x-text="email"></strong>.
                 </div>
