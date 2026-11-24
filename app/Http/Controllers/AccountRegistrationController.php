@@ -31,6 +31,7 @@ class AccountRegistrationController extends Controller
         }
 
         $code = (string) random_int(100000, 999999);
+        $expiresAt = now()->addMinute();
 
         DB::table('pending_account_verifications')->updateOrInsert(
             ['email' => $validated['email']],
@@ -40,7 +41,7 @@ class AccountRegistrationController extends Controller
                 'role' => $validated['role'],
                 'password' => Hash::make($validated['password']),
                 'otp_hash' => Hash::make($code),
-                'otp_expires_at' => now()->addMinute(),
+                'otp_expires_at' => $expiresAt,
                 'updated_at' => now(),
                 'created_at' => now(),
             ],
@@ -53,6 +54,51 @@ class AccountRegistrationController extends Controller
 
         return response()->json([
             'message' => 'A 6-digit verification code has been sent to your email address.',
+            'expires_at' => $expiresAt->toIso8601String(),
+        ]);
+    }
+
+    public function resendCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $pending = DB::table('pending_account_verifications')
+            ->where('email', $validated['email'])
+            ->first();
+
+        if (! $pending) {
+            return response()->json([
+                'message' => 'Your verification request could not be found. Please create your account again.',
+            ], 422);
+        }
+
+        if (now()->lessThan($pending->otp_expires_at)) {
+            return response()->json([
+                'message' => 'You can request a new code after the current code expires.',
+            ], 422);
+        }
+
+        $code = (string) random_int(100000, 999999);
+        $expiresAt = now()->addMinute();
+
+        DB::table('pending_account_verifications')
+            ->where('id', $pending->id)
+            ->update([
+                'otp_hash' => Hash::make($code),
+                'otp_expires_at' => $expiresAt,
+                'updated_at' => now(),
+            ]);
+
+        Mail::to($pending->email)->send(new AccountVerificationCode(
+            $code,
+            $pending->first_name,
+        ));
+
+        return response()->json([
+            'message' => 'A new 6-digit verification code has been sent to your email address.',
+            'expires_at' => $expiresAt->toIso8601String(),
         ]);
     }
 
@@ -73,11 +119,9 @@ class AccountRegistrationController extends Controller
             ], 422);
         }
 
-        if (now()->greaterThan($pending->otp_expires_at)) {
-            DB::table('pending_account_verifications')->where('id', $pending->id)->delete();
-
+        if (now()->greaterThanOrEqualTo($pending->otp_expires_at)) {
             return response()->json([
-                'message' => 'This verification code has expired. Please create your account again.',
+                'message' => 'This verification code has expired. Please request a new code.',
             ], 422);
         }
 

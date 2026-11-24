@@ -160,6 +160,11 @@
 
         <template x-if="mode === 'verify'">
             <form @submit.prevent="verifyCode" class="space-y-4">
+                <button type="button" @click="backToRegistration" :disabled="isLoading" class="inline-flex items-center gap-2 text-[12px] font-semibold text-gray-600 hover:text-[#800000] transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span aria-hidden="true">&larr;</span>
+                    Back to registration
+                </button>
+
                 <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-[12px]">
                     We sent a 6-digit verification code to <strong x-text="email"></strong>.
                 </div>
@@ -177,13 +182,14 @@
                     Code expires in <span class="text-[#800000]" x-text="secondsRemaining + ' seconds'"></span>
                 </p>
 
+                <button x-show="secondsRemaining === 0" type="button" @click="resendCode" :disabled="isLoading" class="w-full text-[12px] font-semibold text-[#800000] hover:text-[#660000] py-1 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span x-show="!isLoading">Resend verification code</span>
+                    <span x-show="isLoading">Sending code...</span>
+                </button>
+
                 <button type="submit" :disabled="isLoading || secondsRemaining === 0" class="w-full ub-maroon-btn font-bold py-2.5 rounded-xl uppercase tracking-widest text-[12px] disabled:opacity-50 disabled:cursor-not-allowed">
                     <span x-show="!isLoading">Verify Code</span>
                     <span x-show="isLoading">Verifying...</span>
-                </button>
-
-                <button type="button" @click="mode = 'register'" class="w-full text-[12px] font-semibold text-gray-600 hover:text-[#800000] py-1 transition-colors duration-300">
-                    Back to registration
                 </button>
             </form>
         </template>
@@ -197,6 +203,7 @@
     <script>
         function createAccountForm() {
             return {
+                verificationStorageKey: 'ub-sync:create-account-verification',
                 mode: 'register',
                 firstName: '',
                 lastName: '',
@@ -205,11 +212,36 @@
                 password: '',
                 confirmPassword: '',
                 code: '',
+                verificationExpiresAt: 0,
                 secondsRemaining: 0,
                 timer: null,
                 errorMessage: '',
                 successMessage: '',
                 isLoading: false,
+
+                init() {
+                    try {
+                        const savedVerification = sessionStorage.getItem(this.verificationStorageKey);
+                        if (!savedVerification) {
+                            return;
+                        }
+
+                        const verification = JSON.parse(savedVerification);
+                        const expiresAt = Number(verification.expiresAt);
+
+                        if (typeof verification.email !== 'string' || !verification.email || !Number.isFinite(expiresAt)) {
+                            sessionStorage.removeItem(this.verificationStorageKey);
+                            return;
+                        }
+
+                        this.mode = 'verify';
+                        this.email = verification.email;
+                        this.verificationExpiresAt = expiresAt;
+                        this.startTimer();
+                    } catch (error) {
+                        this.errorMessage = 'Unable to restore the verification step. Please create your account again.';
+                    }
+                },
 
                 async sendCode() {
                     this.errorMessage = '';
@@ -239,9 +271,15 @@
                             throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Unable to send verification code.');
                         }
 
+                        const expiresAt = Date.parse(data.expires_at);
+                        if (!Number.isFinite(expiresAt)) {
+                            throw new Error('Unable to determine verification code expiration.');
+                        }
+
                         this.mode = 'verify';
                         this.code = '';
-                        this.secondsRemaining = 60;
+                        this.verificationExpiresAt = expiresAt;
+                        this.persistVerification();
                         this.startTimer();
                     } catch (error) {
                         this.errorMessage = error.message;
@@ -250,15 +288,82 @@
                     }
                 },
 
+                async resendCode() {
+                    this.errorMessage = '';
+                    this.successMessage = '';
+                    this.isLoading = true;
+
+                    try {
+                        const response = await fetch("{{ route('create-account.resend-code') }}", {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            },
+                            body: JSON.stringify({ email: this.email })
+                        });
+
+                        const data = await response.json();
+                        if (!response.ok) {
+                            throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Unable to resend verification code.');
+                        }
+
+                        const expiresAt = Date.parse(data.expires_at);
+                        if (!Number.isFinite(expiresAt)) {
+                            throw new Error('Unable to determine verification code expiration.');
+                        }
+
+                        this.code = '';
+                        this.verificationExpiresAt = expiresAt;
+                        this.persistVerification();
+                        this.successMessage = data.message;
+                        this.startTimer();
+                    } catch (error) {
+                        this.errorMessage = error.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                persistVerification() {
+                    try {
+                        sessionStorage.setItem(this.verificationStorageKey, JSON.stringify({
+                            email: this.email,
+                            expiresAt: this.verificationExpiresAt
+                        }));
+                    } catch (error) {
+                        this.errorMessage = 'Code sent, but this browser could not save the verification step for a page refresh.';
+                    }
+                },
+
                 startTimer() {
                     clearInterval(this.timer);
-                    this.timer = setInterval(() => {
-                        this.secondsRemaining--;
-                        if (this.secondsRemaining <= 0) {
+                    const updateSecondsRemaining = () => {
+                        this.secondsRemaining = Math.max(0, Math.ceil((this.verificationExpiresAt - Date.now()) / 1000));
+
+                        if (this.secondsRemaining === 0) {
                             clearInterval(this.timer);
-                            this.secondsRemaining = 0;
                         }
-                    }, 1000);
+                    };
+
+                    updateSecondsRemaining();
+                    if (this.secondsRemaining > 0) {
+                        this.timer = setInterval(updateSecondsRemaining, 1000);
+                    }
+                },
+
+                backToRegistration() {
+                    clearInterval(this.timer);
+                    try {
+                        sessionStorage.removeItem(this.verificationStorageKey);
+                    } catch (error) {
+                        this.errorMessage = 'Unable to clear the saved verification step.';
+                    }
+                    this.mode = 'register';
+                    this.code = '';
+                    this.secondsRemaining = 0;
+                    this.successMessage = '';
                 },
 
                 async verifyCode() {
@@ -282,6 +387,11 @@
                         }
 
                         clearInterval(this.timer);
+                        try {
+                            sessionStorage.removeItem(this.verificationStorageKey);
+                        } catch (error) {
+                            this.errorMessage = 'Unable to clear the saved verification step.';
+                        }
                         this.successMessage = 'Account created successfully. You can now log in.';
                         setTimeout(() => {
                             window.location.href = "{{ route('login') }}";

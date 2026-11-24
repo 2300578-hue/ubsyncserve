@@ -218,6 +218,9 @@ Route::middleware(['guest'])->group(function () {
         return view('login.create-account');
     })->name('create-account');
     Route::post('/signup/send', [AccountRegistrationController::class, 'sendCode'])->name('create-account.send-code');
+    Route::post('/signup/resend', [AccountRegistrationController::class, 'resendCode'])
+        ->middleware('throttle:3,1')
+        ->name('create-account.resend-code');
     Route::post('/signup/verify', [AccountRegistrationController::class, 'verifyCode'])->name('create-account.verify-code');
     Route::get('/forgot', function () {
         return view('login.login');
