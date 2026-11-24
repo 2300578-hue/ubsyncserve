@@ -29,9 +29,9 @@
         data-home-url="{{ route('order.qrcodes') }}"
         class="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 sm:px-8">
         <section class="relative w-full max-w-4xl overflow-hidden rounded-[1.5rem] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
-            <div class="h-2.5 bg-[#19bf9a]"></div>
+            <div class="h-2.5 bg-[#800000]"></div>
             <div class="px-6 py-10 text-center sm:px-12 sm:py-14">
-                <div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[linear-gradient(135deg,#20c5a4,#11a987)] shadow-[0_10px_28px_rgba(18,191,163,0.24)]">
+                <div class="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[#800000] shadow-[0_10px_28px_rgba(128,0,0,0.24)]">
                     <i class="fas fa-check text-4xl text-white" aria-hidden="true"></i>
                 </div>
 
