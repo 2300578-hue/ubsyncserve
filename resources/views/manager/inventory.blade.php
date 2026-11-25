@@ -128,7 +128,7 @@
     </div>
 </div>
 
-<div x-show="showAddModal || editingProductId !== null" x-cloak class="modal-overlay" @click="closeModal()"></div>
+<div x-show="showAddModal || editingProductId !== null" x-cloak class="modal-overlay"></div>
 
 <div x-show="showAddModal || editingProductId !== null" x-cloak
      class="fixed inset-0 flex items-center justify-center z-[1051] p-4 pointer-events-none">

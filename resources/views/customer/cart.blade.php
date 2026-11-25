@@ -81,9 +81,6 @@
                                         </div>
                                     </div>
 
-                                    <button @click="editItem(index)" class="w-full sm:w-auto rounded-xl border border-gray-200 bg-white hover:border-[#800000] hover:text-[#800000] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-black-600 transition-colors shadow-sm">
-                                        <i class="fas fa-sliders-h mr-1.5"></i> Customize
-                                    </button>
                                 </div>
                             </div>
 
