@@ -451,7 +451,7 @@
                             <i class="fas fa-utensils"></i> Advance Orders
                         </p>
                         <div class="max-h-40 overflow-y-auto custom-scroll pr-2 space-y-2">
-                            <template x-for="order in selectedTable.orders" :key="order.id">
+                            <template x-for="(order, index) in selectedTable.orders" :key="index">
                                 <div class="flex justify-between items-center bg-slate-50 border border-slate-100 p-4 rounded-xl transition-colors">
                                     <span class="text-sm font-bold text-slate-700" x-text="order.name"></span>
                                     <span class="text-sm text-[#800000] font-black" x-text="'₱' + order.price.toFixed(2)"></span>
@@ -706,7 +706,7 @@
                 <!-- Items List -->
                 <div class="space-y-3 pb-4 border-b border-slate-200">
                     <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Items</p>
-                    <template x-for="item in (selectedTable?.orders || [])" :key="item.id">
+                    <template x-for="(item, index) in (selectedTable?.orders || [])" :key="index">
                         <div class="flex justify-between items-start text-sm">
                             <div class="flex-1">
                                 <p class="font-semibold text-slate-900" x-text="item.qty + 'x ' + item.name"></p>
