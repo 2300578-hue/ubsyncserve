@@ -95,7 +95,7 @@
                             :class="selectedCategory === cat
                                 ? 'bg-[#800000] text-white shadow-md shadow-maroon/20 border-transparent'
                                 : 'bg-white text-slate-600 border-slate-200 hover:border-[#800000]/30 hover:bg-rose-50/50'"
-                            class="px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-bold tracking-wide whitespace-nowrap transition-all duration-200 flex-shrink-0">
+                            class="px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl border text-xs sm:text-sm font-bold uppercase tracking-widest whitespace-nowrap transition-all duration-200 flex-shrink-0">
                             <span x-text="cat"></span>
                         </button>
                     </template>
@@ -293,7 +293,7 @@
         return {
             searchQuery: '',
             selectedCategory: 'All',
-            categories: ['All'],
+            categories: ['All', 'Breakfast', 'Lunch', 'Snacks', 'Dinner', 'Drinks'],
             tableNumber: null,
             cart: [],
             showCustomize: false,
@@ -323,11 +323,9 @@
                         qty: 1,
                         selectedAddOns: []
                     }));
-                    this.categories = ['All', ...new Set(this.products.map(product => product.cat).filter(Boolean))];
                     this.productError = '';
                 } catch (error) {
                     this.products = [];
-                    this.categories = ['All'];
                     this.productError = error.message || 'Unable to load products from inventory.';
                 }
             },

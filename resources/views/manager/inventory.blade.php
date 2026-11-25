@@ -147,7 +147,18 @@
                     <label class="block text-xs font-black text-slate-700 uppercase mb-2">Product Name</label>
                     <input type="text" x-model="formData.name" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none">
                 </div>
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center">
+                <div>
+                    <label class="block text-xs font-black text-slate-700 uppercase mb-2">Category</label>
+                    <select x-model="formData.category" required class="w-full px-4 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-[#800000] outline-none">
+                        <option value="">Select a category</option>
+                        <option value="Breakfast">Breakfast</option>
+                        <option value="Lunch">Lunch</option>
+                        <option value="Snacks">Snacks</option>
+                        <option value="Dinner">Dinner</option>
+                        <option value="Drinks">Drinks</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center">
                     <div class="text-xs text-blue-700">
                         <i class="fas fa-info-circle"></i>
                         <p class="font-bold">Product stock is calculated from the ingredient quantities below</p>

@@ -309,7 +309,7 @@
                 isClearingTable: false,
                 
                 // Inventory Data
-                formData: { id: null, name: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] },
+                formData: { id: null, name: '', category: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] },
                 products: [],
                 availableIngredients: [],
                 savingIngredientId: null,
@@ -446,7 +446,7 @@
                 },
 
                 resetForm() {
-                    this.formData = { id: null, name: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] };
+                    this.formData = { id: null, name: '', category: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] };
                 },
 
                 formatCurrency(val) {
@@ -1286,6 +1286,7 @@ async clearTable(tableId) {
                     this.formData = {
                         id: product.id,
                         name: product.name,
+                        category: product.cat || '',
                         cost: product.cost,
                         sellingPrice: product.sellingPrice,
                         img: product.img,
@@ -1316,6 +1317,11 @@ async clearTable(tableId) {
 
                     if (!productToSave.name) {
                         this.productFormError = 'Product name is required.';
+                        return;
+                    }
+
+                    if (!productToSave.category) {
+                        this.productFormError = 'Product category is required.';
                         return;
                     }
 
@@ -1424,7 +1430,7 @@ async clearTable(tableId) {
                 },
 
                 resetForm() {
-                    this.formData = { id: null, name: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] };
+                    this.formData = { id: null, name: '', category: '', cost: 0, sellingPrice: 0, img: '', addOns: [], ingredients: [] };
                 },
 
 async init() {
