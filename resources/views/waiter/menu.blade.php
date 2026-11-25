@@ -146,12 +146,6 @@
                                         </button>
                                     </div>
 
-                                    <button @click="openCustomizeModal(p)"
-                                            :disabled="getWaiterProductStock(p) <= 0"
-                                            class="flex-1 rounded-xl border-2 border-slate-100 bg-white h-11 text-[10px] font-bold uppercase tracking-widest text-black-500 transition-all"
-                                            :class="getWaiterProductStock(p) <= 0 ? 'opacity-50 cursor-not-allowed' : 'hover:border-[#800000] hover:text-[#800000]'">
-                                        Add-ons
-                                    </button>
                                 </div>
 
                                 <button @click.prevent="addToCart(p)"

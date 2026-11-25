@@ -223,25 +223,6 @@
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-black text-slate-700 uppercase mb-2">Add-ons</label>
-                    <div class="space-y-3">
-                        <template x-for="(addon, index) in formData.addOns" :key="index">
-                            <div class="grid grid-cols-12 gap-2 items-end">
-                                <div class="col-span-6">
-                                    <input type="text" x-model="addon.name" placeholder="Add-on name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none">
-                                </div>
-                                <div class="col-span-4">
-                                    <input type="number" x-model.number="addon.price" placeholder="Price" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#800000] outline-none">
-                                </div>
-                                <button type="button" @click="removeAddOn(index)" class="col-span-2 px-3 py-2 bg-red-100 text-red-700 rounded-xl font-bold">Remove</button>
-                            </div>
-                        </template>
-                        <button type="button" @click="addAddOn()" class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#800000] text-white rounded-2xl font-black uppercase text-xs hover:bg-[#660000] transition-all">
-                            <i class="fas fa-plus"></i> Add Add-on
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
 

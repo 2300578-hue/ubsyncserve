@@ -163,11 +163,6 @@
                                     </button>
                                 </div>
 
-                                <button @click="openCustomizeModal(product)"
-                                        :disabled="getProductStock(product) <= 0"
-                                        :class="['flex-1 rounded-lg sm:rounded-xl border-2 border-slate-100 h-8 sm:h-9 md:h-10 lg:h-11 text-[7px] sm:text-[8px] md:text-[9px] lg:text-[10px] font-bold uppercase tracking-widest text-center transition-all px-0.5 sm:px-1', getProductStock(product) <= 0 ? 'bg-slate-50 text-slate-300 cursor-not-allowed' : 'bg-white text-black-500 hover:border-[#800000] hover:text-[#800000]']">
-                                    <i class="fas fa-sliders-h mr-0.5 sm:mr-1"></i><span class="hidden sm:inline">Add-ons</span><span class="sm:hidden">+</span>
-                                </button>
                             </div>
 
                             <button @click.prevent="addToCart(product)"
