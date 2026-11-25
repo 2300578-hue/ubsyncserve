@@ -163,27 +163,25 @@
                                     </button>
                                 </div>
 
+                                <button @click.prevent="addToCart(product)"
+                                        :disabled="getProductStock(product) <= 0"
+                                        :class="['flex-1 min-w-0 rounded-lg sm:rounded-xl md:rounded-[1rem] h-8 sm:h-9 md:h-10 lg:h-11 text-[8px] sm:text-[9px] md:text-[10px] lg:text-[11px] font-black uppercase tracking-widest text-center transition-all flex items-center justify-center gap-1 sm:gap-2', getProductStock(product) <= 0 ? 'bg-[#b8bcc6] text-white shadow-inner cursor-not-allowed' : 'maroon-gradient text-white shadow-lg shadow-maroon/20 hover:shadow-xl active:scale-[0.98]']">
+                                    <template x-if="getProductStock(product) > 0">
+                                        <span class="flex items-center gap-1 sm:gap-2">
+                                            <i class="fas fa-shopping-bag text-[7px] sm:text-[8px] md:text-xs"></i>
+                                            <span class="hidden sm:inline">Add to Order</span>
+                                            <span class="sm:hidden">Add</span>
+                                        </span>
+                                    </template>
+
+                                    <template x-if="product.stock <= 0">
+                                        <span class="flex items-center gap-1 sm:gap-2">
+                                            <i class="fas fa-lock text-[7px] sm:text-[8px] md:text-xs"></i>
+                                            <span>SOLD OUT</span>
+                                        </span>
+                                    </template>
+                                </button>
                             </div>
-
-                            <button @click.prevent="addToCart(product)"
-                                    :disabled="getProductStock(product) <= 0"
-                                    :class="['w-full rounded-lg sm:rounded-xl md:rounded-[1rem] h-8 sm:h-9 md:h-10 lg:h-11 text-[8px] sm:text-[9px] md:text-[10px] lg:text-[11px] font-black uppercase tracking-widest text-center transition-all flex items-center justify-center gap-1 sm:gap-2', getProductStock(product) <= 0 ? 'bg-[#b8bcc6] text-white shadow-inner cursor-not-allowed' : 'maroon-gradient text-white shadow-lg shadow-maroon/20 hover:shadow-xl active:scale-[0.98]']">
-
-                                <template x-if="getProductStock(product) > 0">
-                                    <span class="flex items-center gap-1 sm:gap-2">
-                                        <i class="fas fa-shopping-bag text-[7px] sm:text-[8px] md:text-xs"></i>
-                                        <span class="hidden sm:inline">Add to Order</span>
-                                        <span class="sm:hidden">Add</span>
-                                    </span>
-                                </template>
-
-                                <template x-if="product.stock <= 0">
-                                    <span class="flex items-center gap-1 sm:gap-2">
-                                        <i class="fas fa-lock text-[7px] sm:text-[8px] md:text-xs"></i> 
-                                        <span>SOLD OUT</span>
-                                    </span>
-                                </template>
-                            </button>
                         </div>
                     </div>
                 </div>

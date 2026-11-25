@@ -133,7 +133,7 @@
                                 </template>
                             </div>
 
-                            <div class="space-y-3">
+                            <div>
                                 <div class="flex items-center gap-2">
                                     <div class="flex items-center rounded-xl border-2 border-slate-100 bg-slate-50 h-11 w-28 overflow-hidden"
                                          :class="getWaiterProductStock(p) <= 0 ? 'opacity-50 pointer-events-none' : ''">
@@ -146,15 +146,14 @@
                                         </button>
                                     </div>
 
+                                    <button @click.prevent="addToCart(p)"
+                                            :disabled="getWaiterProductStock(p) <= 0"
+                                            class="flex-1 h-11 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] transition-all flex items-center justify-center gap-2"
+                                            :class="getWaiterProductStock(p) <= 0 ? 'bg-[#b8bcc6] text-white shadow-inner cursor-not-allowed' : 'bg-[#800000] text-white shadow-lg shadow-maroon/20 active:scale-95 hover:bg-[#600000]'">
+                                        <i x-show="getWaiterProductStock(p) <= 0" class="fa-solid fa-lock text-[11px]"></i>
+                                        <span x-text="getWaiterProductStock(p) <= 0 ? 'SOLD OUT' : 'Add to Order'"></span>
+                                    </button>
                                 </div>
-
-                                <button @click.prevent="addToCart(p)"
-                                        :disabled="getWaiterProductStock(p) <= 0"
-                                        class="w-full py-4 rounded-xl text-[11px] font-black uppercase tracking-[0.1em] transition-all flex items-center justify-center gap-2"
-                                        :class="getWaiterProductStock(p) <= 0 ? 'bg-[#b8bcc6] text-white shadow-inner cursor-not-allowed' : 'bg-[#800000] text-white shadow-lg shadow-maroon/20 active:scale-95 hover:bg-[#600000]'">
-                                    <i x-show="getWaiterProductStock(p) <= 0" class="fa-solid fa-lock text-[11px]"></i>
-                                    <span x-text="getWaiterProductStock(p) <= 0 ? 'SOLD OUT' : 'Add to Order'"></span>
-                                </button>
                             </div>
                         </div>
                     </div>
